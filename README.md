@@ -1,5 +1,4 @@
 ## webpack-wxapp-module-plugin
-
 [![NPM version][webpack-wxapp-module-plugin]][npm-url]
 
 ### 一、简介
@@ -24,7 +23,7 @@
     
 ### 三、使用
 
-Webpack config example:
+Webpack 简单配置
 
 ```js
 var WxappModulePlugin  =require('webpack-wxapp-module-plugin');
