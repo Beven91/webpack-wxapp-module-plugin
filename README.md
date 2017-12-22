@@ -48,12 +48,98 @@ module.exports = {
 ### 四、完整脚手架配置案例
 
 ```js
-
+module.exports = {
+  //devtool: 'source-map',
+  name: 'arthur-pendragon',
+  context: config.src,
+  stats: 'normal',
+  target: "node",
+  entry: {
+    'app': './app.js'
+  },
+  output: {
+    path: config.dist,
+    filename: '[name]',
+    chunkFilename: '[name]',
+    libraryTarget: "commonjs2",
+    publicPath: ''
+  },
+  plugins: [
+    new ProgressBarPlugin(),
+    new WxappModulePlugin(config.src),
+    new CleanWebpackPlugin('**/*.*', { root: config.dist }),
+    new webpack.DefinePlugin({ 'process.env': { NODE_ENV: process.env.NODE_ENV } }),
+    new webpack.NoEmitOnErrorsPlugin(),
+  ],
+  module: {
+    loaders: [
+      {
+        //使用babel-loader编译js
+        test: /\.js$/,
+        use: [
+          {
+            loader: 'babel-loader',
+            options: {
+              presets: config.babelRc.presets,
+              plugins: config.babelRc.plugins
+            },
+          }
+        ],
+      },
+      //使用file-loader处理资源文件复制
+      {
+        test: /\.(json|wxss)$/,
+        use: [
+          {
+            loader: 'file-loader',
+            options: {
+              name: '[path][name].[ext]',
+            },
+          },
+        ],
+      },
+      {
+        // 图片类型模块资源访问
+        test: /\.(png|jpg|jpeg|gif|webp|bmp|ico|jpeg)$/,
+        use: [
+          {
+            loader: 'file-loader',
+            options: {
+              name: '[path][name].[ext]'
+            }
+          },
+          {
+            loader: 'image-webpack-loader',
+            options: config.minOptions,
+          },
+        ],
+      },
+      //使用wxml-loader处理.wxml文件，主要用于搜索引用的图片等资源
+      {
+        test: /\.wxml$/,
+        use: [
+          {
+            loader: 'file-loader',
+            options: {
+              name: '[path][name].wxml',
+            },
+          },
+          {
+            loader: 'wxml-loader',
+            options: {
+              root: config.src,
+            },
+          },
+        ],
+      }
+    ]
+  }
+}
 
 ```
 
 ### 五、开源许可
 基于 [MIT License](http://zh.wikipedia.org/wiki/MIT_License) 开源，使用代码只需说明来源，或者引用 [license.txt](https://github.com/sofish/typo.css/blob/master/license.txt) 即可。
 
-[npm-url]: https://www.npmjs.com/package/webpack-node-module-plugin
-[npm-image]: https://img.shields.io/npm/v/webpack-node-module-plugin.svg
+[npm-url]: https://www.npmjs.com/package/webpack-wxapp-module-plugin
+[npm-image]: https://img.shields.io/npm/v/webpack-wxapp-module-plugin.svg
