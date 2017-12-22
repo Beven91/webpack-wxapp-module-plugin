@@ -1,6 +1,6 @@
 ## webpack-wxapp-module-plugin
 
-[![NPM version][webpack-wxapp-module-plugin]][npm-url]
+[![NPM version][npm-image]][npm-url]
 
 ### 一、简介
 
