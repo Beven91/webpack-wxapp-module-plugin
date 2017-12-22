@@ -1,4 +1,5 @@
 ## webpack-wxapp-module-plugin
+
 [![NPM version][webpack-wxapp-module-plugin]][npm-url]
 
 ### 一、简介
@@ -7,7 +8,7 @@
 
 ###### 支持哪些特性?
 
-- 仅需要配置`entry` 指向`app.js`即可 例如 `entry:'./app.js'`
+- 仅需要配置`entry` 指向`app.js`即可 例如 `entry:'./app.js'`
 - 支持`node_modules` 模块引用
 - 打包后的`require`会自动设置 例如: require('lodash') 那么当打包后在dist下的引用变为 require('./node_modules/lodash/inde.jx)
 - 自动分析需要编译的文件，产出wxapp需要的目录结构 例如pages以及components,.wxml引用的图片，以及app.json引用的图片等
