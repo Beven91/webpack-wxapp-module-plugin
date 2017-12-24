@@ -12,6 +12,7 @@ var NormalModule = require('webpack/lib/NormalModule.js')
 var AMDPlugin = require('webpack/lib/dependencies/AMDPlugin.js')
 var SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
 var MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin');
+var HarmonyDetectionParserPlugin = require("webpack/lib/dependencies/HarmonyDetectionParserPlugin")
 var ConcatSource = require('webpack-sources').ConcatSource
 
 var RESOUR_CHUNK_NAME = "@@RESOURCEENTRY@@";
@@ -19,6 +20,9 @@ var RESOUR_CHUNK_NAME = "@@RESOURCEENTRY@@";
 //取消AMD模式
 AMDPlugin.prototype.apply = function () {
 
+}
+HarmonyDetectionParserPlugin.prototype.apply = function(){
+  
 }
 
 /**

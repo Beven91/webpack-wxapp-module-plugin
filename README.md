@@ -36,7 +36,8 @@ module.exports = {
     'app': ['./app.js']
   },
   output: {
-    filename:  '[name].js',
+    filename:  '[name]',
+    chunkFilename:'[name]',
     libraryTarget: 'commonjs2'
   },
   plugins:[

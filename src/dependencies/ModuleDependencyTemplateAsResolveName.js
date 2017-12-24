@@ -6,6 +6,7 @@
  */
 var path = require('path')
 var CommonJsRequireDependency = require('webpack/lib/dependencies/CommonJsRequireDependency.js')
+var HarmonyImportDependency = require('webpack/lib/dependencies/HarmonyImportDependency.js')
 
 var resolveExtensions = [];
 var ORIGINAL_REQUIRE_JS = require.extensions['.js'];
@@ -31,6 +32,7 @@ ModuleDependencyTemplateAsResolveName.prototype.apply = function (dep, source, o
   var cExtName = path.extname(content);
   var extName = path.extname(resource || content)
   var hasAssets = Object.keys(module.assets || {}).length > 0;
+  var original = source._source._value.substring(dep.range[0],dep.range[1]-1);
   
   if(path.isAbsolute(content)){
     content = this.absoluteResolve(content,sourcePath);
@@ -46,7 +48,12 @@ ModuleDependencyTemplateAsResolveName.prototype.apply = function (dep, source, o
   }else{
     content = this.relativeResolve(sourcePath,resource)
   }
-  source.replace(dep.range[0], dep.range[1] - 1, '\'' + content + '\'');
+  if(dep.type==='harmony import'){
+    var prefix = original.split(' from ')[0];
+    source.replace(dep.range[0], dep.range[1] - 1, prefix+' from  \'' + content + '\'');
+  }else{
+    source.replace(dep.range[0], dep.range[1] - 1, '\'' + content + '\'');
+  }
 }
 
 /**
@@ -99,6 +106,7 @@ ModuleDependencyTemplateAsResolveName.prototype.moduleFileResolve  =function(con
 
 // 覆盖默认模板
 CommonJsRequireDependency.Template = ModuleDependencyTemplateAsResolveName
+HarmonyImportDependency.Template = ModuleDependencyTemplateAsResolveName;
 
 module.exports.setOptions = function (options) {
   var resolve = options.resolve || {};
