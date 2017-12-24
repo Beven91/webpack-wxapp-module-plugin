@@ -82,7 +82,7 @@ ModuleDependencyTemplateAsResolveName.prototype.relativeResolve  =function(sourc
     var info = path.parse(content)
     extName = extName !== '.js' ? extName + '.js' : extName;
     content = path.join(info.dir, info.name + extName)
-    content = content.replace(/\.\.\/node_modules/, 'node_modules')
+    content = content.replace(/\\/g,'/').replace(/\.\.\/node_modules/, 'node_modules')
     content = './' + content.replace(/\\/g, '/')
     return content;
 }

@@ -62,7 +62,7 @@ WxAppModulePlugin.prototype.apply = function (compiler) {
  * 初始化小程序引用的页面以及组件与对应的资源文件例如:.json .wxss .wxml,tabBarIcons
  */
 WxAppModulePlugin.prototype.initPageModules = function () {
-  var resourceModules = [];
+  var resourceModules = [path.join(this.projectRoot, 'project.config.json')];
   var pageModules = [];
   var thisContext = this;
   var typedExtensions = this.typedExtensions
@@ -71,7 +71,7 @@ WxAppModulePlugin.prototype.initPageModules = function () {
   pages.forEach(function (page) {
     var modulePath = thisContext.getModuleFullPath(page);
     var parts = path.parse(modulePath);
-    var namePath = path.join(parts.root, parts.dir, parts.name);
+    var namePath = path.join(parts.dir, parts.name);
     //附加页面引用的所有组件
     thisContext.pushComponents(pages, modulePath, namePath);
     //搜索当前页面对应的资源文件
@@ -166,15 +166,15 @@ WxAppModulePlugin.prototype.registerChunks = function (compilation) {
  * 处理文件输出
  */
 WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, compilation) {
-  var info = path.parse(path.relative(this.projectRoot, mod.userRequest))
-  var name = path.join(info.root, info.dir, info.name).replace(/\.\.\/node_modules/, 'node_modules')
+  var info = path.parse(path.relative(this.projectRoot, mod.userRequest));
+  var name = path.join(info.dir, info.name).replace(/\\/g, '/').replace(/\.\.\/node_modules/, 'node_modules')
   var nameWith = name + info.ext;
   var newChunk = this.extraChunks[nameWith]
   if (chunk.name === RESOUR_CHUNK_NAME) {
     return;
   }
-  if(nameWith.indexOf("node_modules")>-1){
-    name = name.replace("node_modules",this.nodeModulesName);
+  if (nameWith.indexOf("node_modules") > -1) {
+    name = name.replace("node_modules", this.nodeModulesName);
   }
   name = name + info.ext;
   if (!newChunk) {
