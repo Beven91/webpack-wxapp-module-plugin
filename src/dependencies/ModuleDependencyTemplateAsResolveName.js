@@ -9,6 +9,7 @@ var CommonJsRequireDependency = require('webpack/lib/dependencies/CommonJsRequir
 var HarmonyImportDependency = require('webpack/lib/dependencies/HarmonyImportDependency.js')
 
 var resolveExtensions = [];
+var Nodes_Module_Name = "";
 var ORIGINAL_REQUIRE_JS = require.extensions['.js'];
 
 /**
@@ -48,6 +49,7 @@ ModuleDependencyTemplateAsResolveName.prototype.apply = function (dep, source, o
   }else{
     content = this.relativeResolve(sourcePath,resource)
   }
+  content = content.replace("node_modules",Nodes_Module_Name);
   if(dep.type==='harmony import'){
     var prefix = original.split(' from ')[0];
     source.replace(dep.range[0], dep.range[1] - 1, prefix+' from  \'' + content + '\'');
@@ -80,7 +82,7 @@ ModuleDependencyTemplateAsResolveName.prototype.relativeResolve  =function(sourc
     var info = path.parse(content)
     extName = extName !== '.js' ? extName + '.js' : extName;
     content = path.join(info.dir, info.name + extName)
-    content = content.replace(/^\.\.\//, '')
+    content = content.replace(/\.\.\/node_modules/, 'node_modules')
     content = './' + content.replace(/\\/g, '/')
     return content;
 }
@@ -109,9 +111,5 @@ CommonJsRequireDependency.Template = ModuleDependencyTemplateAsResolveName
 HarmonyImportDependency.Template = ModuleDependencyTemplateAsResolveName;
 
 module.exports.setOptions = function (options) {
-  var resolve = options.resolve || {};
-  resolveExtensions = resolve.extensions || [];
-  resolveExtensions.forEach(function (ext) {
-    require.extensions[ext] = ORIGINAL_REQUIRE_JS;
-  })
+  Nodes_Module_Name = options.nodeModulesName;
 }

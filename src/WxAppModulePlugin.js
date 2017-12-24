@@ -21,23 +21,25 @@ var RESOUR_CHUNK_NAME = "@@RESOURCEENTRY@@";
 AMDPlugin.prototype.apply = function () {
 
 }
-HarmonyDetectionParserPlugin.prototype.apply = function(){
-  
+HarmonyDetectionParserPlugin.prototype.apply = function () {
+
 }
 
 /**
  * 微信小程序模块打包插件
  * @param {String} projectRoot 微信小程序app.js所在的目录
  */
-function WxAppModulePlugin(projectRoot) {
+function WxAppModulePlugin(projectRoot, nodeModulesName) {
   this.extraChunks = {}
   this.extraPackage = {};
   this.typedExtensions = ['.wxml', '.wxss', '.json'];
   this.projectRoot = projectRoot;
   this.resourceModules = [];
   this.pageModules = [];
+  this.nodeModulesName = nodeModulesName || "app_node_modules";
   this.Resolve = require('./dependencies/ModuleDependencyTemplateAsResolveName.js');
   this.Template = require('./dependencies/NodeRequireHeaderDependencyTemplate.js')
+  this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName })
   this.initPageModules();
 }
 
@@ -142,6 +144,7 @@ WxAppModulePlugin.prototype.registerModuleEntry = function (compiler) {
 WxAppModulePlugin.prototype.registerChunks = function (compilation) {
   var thisContext = this
   compilation.plugin('optimize-chunks', function (chunks) {
+    thisContext.extraChunks = {};
     this.chunks = [];
     this.entrypoints = {};
     this.namedChunks = {};
@@ -164,11 +167,14 @@ WxAppModulePlugin.prototype.registerChunks = function (compilation) {
  */
 WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, compilation) {
   var info = path.parse(path.relative(this.projectRoot, mod.userRequest))
-  var name = path.join(info.root, info.dir, info.name).replace(/^\.\.\//, '')
+  var name = path.join(info.root, info.dir, info.name).replace(/\.\.\/node_modules/, 'node_modules')
   var nameWith = name + info.ext;
   var newChunk = this.extraChunks[nameWith]
   if (chunk.name === RESOUR_CHUNK_NAME) {
     return;
+  }
+  if(nameWith.indexOf("node_modules")>-1){
+    name = name.replace("node_modules",this.nodeModulesName);
   }
   name = name + info.ext;
   if (!newChunk) {
