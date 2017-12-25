@@ -29,10 +29,10 @@ HarmonyDetectionParserPlugin.prototype.apply = function () {
  * 微信小程序模块打包插件
  * @param {String} projectRoot 微信小程序app.js所在的目录
  */
-function WxAppModulePlugin(projectRoot, nodeModulesName) {
+function WxAppModulePlugin(projectRoot, nodeModulesName, extensions) {
   this.extraChunks = {}
   this.extraPackage = {};
-  this.typedExtensions = ['.wxml', '.wxss', '.json'];
+  this.typedExtensions = ['.wxml', '.wxss', '.json'].concat(extensions || []);
   this.projectRoot = projectRoot;
   this.resourceModules = [];
   this.pageModules = [];
@@ -173,8 +173,8 @@ WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, com
   if (chunk.name === RESOUR_CHUNK_NAME) {
     return;
   }
-  if(nameWith.indexOf("node_modules")>-1){
-    name = name.replace("node_modules",this.nodeModulesName);
+  if (nameWith.indexOf("node_modules") > -1) {
+    name = name.replace("node_modules", this.nodeModulesName);
   }
   name = name + info.ext;
   if (!newChunk) {
