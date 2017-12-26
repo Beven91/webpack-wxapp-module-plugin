@@ -40,13 +40,13 @@ function WxAppModulePlugin(projectRoot, nodeModulesName, extensions) {
   this.Resolve = require('./dependencies/ModuleDependencyTemplateAsResolveName.js');
   this.Template = require('./dependencies/NodeRequireHeaderDependencyTemplate.js')
   this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName })
-  this.initPageModules();
 }
 
 WxAppModulePlugin.prototype.apply = function (compiler) {
   var thisContext = this
   this.options = compiler.options;
   compiler.plugin('this-compilation', function (compilation) {
+    thisContext.initPageModules();
     // 自动根据app.js作为入口，分析哪些文件需要单独产出，以及node_modules使用了哪些模块
     thisContext.registerModuleEntry(compiler)
     //单文件模块与node_modules模块处理
@@ -74,6 +74,11 @@ WxAppModulePlugin.prototype.initPageModules = function () {
     var namePath = path.join(parts.dir, parts.name);
     //附加页面引用的所有组件
     thisContext.pushComponents(pages, modulePath, namePath);
+  })
+  pages.forEach(function (page) {
+    var modulePath = thisContext.getModuleFullPath(page);
+    var parts = path.parse(modulePath);
+    var namePath = path.join(parts.dir, parts.name);
     //搜索当前页面对应的资源文件
     resourceModules = resourceModules.concat(typedExtensions.map(function (ext) { return namePath + ext; }))
     if (page !== 'app') {
@@ -97,8 +102,8 @@ WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePa
   var components = this.requireJson(namePath + '.json').usingComponents || {};
   var moduleDir = path.dirname(modulePath);
   for (var name in components) {
-    var componentPath = path.join(moduleDir, components[i]);
-    var componentEntry = path.relative(projectRoot, componentPath).toLowerCase();
+    var componentPath = path.join(moduleDir, components[name]);
+    var componentEntry = path.relative(this.projectRoot, componentPath).toLowerCase();
     if (pages.indexOf(componentEntry) < 0) {
       pages.push(componentEntry);
     }
