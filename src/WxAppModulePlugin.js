@@ -67,7 +67,7 @@ WxAppModulePlugin.prototype.initPageModules = function () {
   var thisContext = this;
   var typedExtensions = this.typedExtensions
   var config = fse.readJsonSync(path.join(this.projectRoot, 'app.json'));
-  var pages = ['app'].concat(config.pages || []);
+  var pages = ['app'].concat(this.searchSubPackages(config, config.pages));
   pages.forEach(function (page) {
     var modulePath = thisContext.getModuleFullPath(page);
     var parts = path.parse(modulePath);
@@ -91,6 +91,25 @@ WxAppModulePlugin.prototype.initPageModules = function () {
   this.resourceModules = resourceModules.filter(fse.existsSync.bind(fse));
   this.pageModules = pageModules;
 }
+
+/**
+ * 搜索subPackages
+ * @param {Object} config app.json配置
+ * @param {Array<String>} pages 已经搜索到的pages
+ */
+WxAppModulePlugin.prototype.searchSubPackages = function (config, pages) {
+  pages = pages || [];
+  var subPackages = config.subPackages || [];
+  subPackages.forEach(function (package) {
+    var subPages = package.pages || [];
+    var root = package.root;
+    subPages.forEach(function (page) {
+      pages.push(root + page);
+    })
+  })
+  return pages;
+}
+
 
 /**
  * 获取指定小程序页面引用的所有组件
