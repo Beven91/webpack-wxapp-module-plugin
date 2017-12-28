@@ -42,7 +42,7 @@ ModuleDependencyTemplateAsResolveName.prototype.apply = function (dep, source, o
   } else if (hasAssets && extName && extName != '.js') {
     content = this.assetsResolve(content,extName);
    } else if (content.indexOf('/') > -1 && cExtName !== extName && cExtName!=='.js') {
-    content = this.moduleFileResolve(content,resource,extName);
+    content = this.moduleFileResolve(content,resource,extName,sourcePath);
   }else if(extName!=='' && extName!=='.js') {
     var info = path.parse(content)
     content = path.join(info.dir, info.name + extName+'.js').replace(/\\/g, '/');
@@ -99,11 +99,9 @@ ModuleDependencyTemplateAsResolveName.prototype.assetsResolve  =function(request
 /**
  * 模块下文件引用处理 require('webpack/lib/NormalModule.js')
  */
-ModuleDependencyTemplateAsResolveName.prototype.moduleFileResolve  =function(content,resource,extName){
+ModuleDependencyTemplateAsResolveName.prototype.moduleFileResolve  =function(content,resource,extName,sourcePath){
     var resolve = (extName=='.js'? resource: require.resolve(content)).replace(/\\/g, '/');
-    var moduleName = content.split('/')[0];
-    var usePath = resolve.split('node_modules/'+moduleName).pop()
-    return moduleName + usePath;
+    return this.relativeResolve(sourcePath,resolve);
 }
 
 // 覆盖默认模板
