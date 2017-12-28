@@ -1,303 +1,113 @@
 /**
- * 名称：微信小程序webapck插件
- * 日期:2017-12-19
- * 描述：
- *     使微信程序支持webpack打包
+ * 名称：webpack 模块引用标识符模板
+ * 日期:2017-06-01
+ * 描述：用于替换CommonJsRequireDependency.Template 
+ *      从而实现 require(模块名称)  而不是require(模块id)
  */
-
 var path = require('path')
-var fse = require('fs-extra');
-var Entrypoint = require('webpack/lib/Entrypoint')
-var NormalModule = require('webpack/lib/NormalModule.js')
-var AMDPlugin = require('webpack/lib/dependencies/AMDPlugin.js')
-var SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
-var MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin');
-var HarmonyDetectionParserPlugin = require("webpack/lib/dependencies/HarmonyDetectionParserPlugin")
-var ConcatSource = require('webpack-sources').ConcatSource
+var CommonJsRequireDependency = require('webpack/lib/dependencies/CommonJsRequireDependency.js')
+var HarmonyImportDependency = require('webpack/lib/dependencies/HarmonyImportDependency.js')
 
-var RESOUR_CHUNK_NAME = "@@RESOURCEENTRY@@";
+var resolveExtensions = [];
+var Nodes_Module_Name = "";
+var ORIGINAL_REQUIRE_JS = require.extensions['.js'];
 
-//取消AMD模式
-AMDPlugin.prototype.apply = function () {
-
-}
-HarmonyDetectionParserPlugin.prototype.apply = function () {
-
+/**
+ * webpack require 使用模块名称作为模块标识
+ * 用于替换 ModuleDependencyTemplateAsId 模板
+ */
+function ModuleDependencyTemplateAsResolveName() {
 }
 
 /**
- * 微信小程序模块打包插件
- * @param {String} projectRoot 微信小程序app.js所在的目录
+ * 依赖模块引用替换处理
  */
-function WxAppModulePlugin(projectRoot, nodeModulesName, extensions) {
-  this.extraChunks = {}
-  this.extraPackage = {};
-  this.typedExtensions = ['.wxml', '.wxss', '.json'].concat(extensions || []);
-  this.projectRoot = projectRoot;
-  this.resourceModules = [];
-  this.pageModules = [];
-  this.nodeModulesName = nodeModulesName || "app_node_modules";
-  this.Resolve = require('./dependencies/ModuleDependencyTemplateAsResolveName.js');
-  this.Template = require('./dependencies/NodeRequireHeaderDependencyTemplate.js')
-  this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName })
-}
-
-WxAppModulePlugin.prototype.apply = function (compiler) {
-  var thisContext = this
-  this.options = compiler.options;
-  compiler.plugin('this-compilation', function (compilation) {
-    thisContext.initPageModules();
-    // 自动根据app.js作为入口，分析哪些文件需要单独产出，以及node_modules使用了哪些模块
-    thisContext.registerModuleEntry(compiler)
-    //单文件模块与node_modules模块处理
-    thisContext.registerChunks(compilation);
-    // 自定义js打包模板渲染 取消webpackrequire机制，改成纯require
-    thisContext.registerModuleTemplate(compilation)
-    //注册 normal-module-loader
-    thisContext.registerNormalModuleLoader(compilation);
-  })
-}
-
-/**
- * 初始化小程序引用的页面以及组件与对应的资源文件例如:.json .wxss .wxml,tabBarIcons
- */
-WxAppModulePlugin.prototype.initPageModules = function () {
-  var resourceModules = [path.join(this.projectRoot, 'project.config.json')];
-  var pageModules = [];
-  var thisContext = this;
-  var typedExtensions = this.typedExtensions
-  var config = fse.readJsonSync(path.join(this.projectRoot, 'app.json'));
-  var pages = ['app'].concat(this.searchSubPackages(config, config.pages));
-  pages.forEach(function (page) {
-    var modulePath = thisContext.getModuleFullPath(page);
-    var parts = path.parse(modulePath);
-    var namePath = path.join(parts.dir, parts.name);
-    //附加页面引用的所有组件
-    thisContext.pushComponents(pages, modulePath, namePath);
-  })
-  pages.forEach(function (page) {
-    var modulePath = thisContext.getModuleFullPath(page);
-    var parts = path.parse(modulePath);
-    var namePath = path.join(parts.dir, parts.name);
-    //搜索当前页面对应的资源文件
-    resourceModules = resourceModules.concat(typedExtensions.map(function (ext) { return namePath + ext; }))
-    if (page !== 'app') {
-      pageModules.push(page + '.js');
-    }
-  })
-  //导出app.json配置的图片
-  this.pushTabBarIcons(config, resourceModules);
-  //过滤掉不存在文件
-  this.resourceModules = resourceModules.filter(fse.existsSync.bind(fse));
-  this.pageModules = pageModules;
-}
-
-/**
- * 搜索subPackages
- * @param {Object} config app.json配置
- * @param {Array<String>} pages 已经搜索到的pages
- */
-WxAppModulePlugin.prototype.searchSubPackages = function (config, pages) {
-  pages = pages || [];
-  var subPackages = config.subPackages || [];
-  subPackages.forEach(function (package) {
-    var subPages = package.pages || [];
-    var root = package.root;
-    subPages.forEach(function (page) {
-      pages.push(root + page);
-    })
-  })
-  return pages;
-}
-
-
-/**
- * 获取指定小程序页面引用的所有组件
- * @param {Array} pages 目前搜索到的页面组件
- * @param {modulePath} 页面完整路径
- * @param {namePath} 页面模块完整路径不带后缀名
- */
-WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePath) {
-  var components = this.requireJson(namePath + '.json').usingComponents || {};
-  var moduleDir = path.dirname(modulePath);
-  for (var name in components) {
-    var componentPath = path.join(moduleDir, components[name]);
-    var componentEntry = path.relative(this.projectRoot, componentPath).toLowerCase();
-    if (pages.indexOf(componentEntry) < 0) {
-      pages.push(componentEntry);
-    }
+ModuleDependencyTemplateAsResolveName.prototype.apply = function (dep, source, outputOptions, requestShortener) {
+  if (!dep.range) return
+  var module = dep.module
+  var request = dep.userRequest
+  var content = request
+  var resource = module.resource;
+  var sourcePath = source._source._name
+  var isRequirejs = (request.indexOf('./') > -1 || request.indexOf('../') > -1) || request.indexOf('image!') == 0;
+  var cExtName = path.extname(content);
+  var extName = path.extname(resource || content)
+  var hasAssets = Object.keys(module.assets || {}).length > 0;
+  var original = source._source._value.substring(dep.range[0],dep.range[1]-1);
+  
+  if(path.isAbsolute(content)){
+    content = this.absoluteResolve(content,sourcePath);
+  }else if (resource && isRequirejs) {
+    content = this.relativeResolve(sourcePath,resource);
+  } else if (hasAssets && extName && extName != '.js') {
+    content = this.assetsResolve(content,extName);
+   } else if (content.indexOf('/') > -1 && cExtName !== extName && cExtName!=='.js') {
+    content = this.moduleFileResolve(content,resource,extName,sourcePath);
+  }else if(extName!=='' && extName!=='.js') {
+    var info = path.parse(content)
+    content = path.join(info.dir, info.name + extName+'.js').replace(/\\/g, '/');
+  }else{
+    content = this.relativeResolve(sourcePath,resource)
+  }
+  content = content.replace("node_modules",Nodes_Module_Name);
+  if(dep.type==='harmony import'){
+    var prefix = original.split(' from ')[0];
+    source.replace(dep.range[0], dep.range[1] - 1, prefix+' from  \'' + content + '\'');
+  }else{
+    source.replace(dep.range[0], dep.range[1] - 1, '\'' + content + '\'');
   }
 }
 
 /**
- * 获取app.json配置的图标
- * @param {Object} config app.json内容
- * @param {Array} resourceModules 小程序非js资源 例如 .wxss .wxml .json jpg...
+ * 绝对路径引用处理 require('d:/as/aa.js')
  */
-WxAppModulePlugin.prototype.pushTabBarIcons = function (config, resourceModules) {
-  var tabBar = config.tabBar || {};
-  var tabBarList = tabBar.list || [];
-  var projectRoot = this.projectRoot;
-  tabBarList.forEach(function (tabBarItem) {
-    if (tabBarItem.iconPath) {
-      resourceModules.push(projectRoot, path.join(tabBarItem.iconPath))
+ModuleDependencyTemplateAsResolveName.prototype.absoluteResolve  =function(content,sourcePath){
+    var holder = "node_modules/";
+    var index = content.indexOf(holder);
+    if(index>-1){
+      return content.substring(index+holder.length);
+    }else{
+      return this.relativeResolve(sourcePath,content)
     }
-    if (tabBarItem.selectedIconPath) {
-      resourceModules.push(projectRoot, path.join(tabBarItem.selectedIconPath))
-    }
-  })
 }
 
 /**
- * 添加微信小程序app.json配置的所有入口页面
+ * 相对require处理 例如: require('./xxx')
  */
-WxAppModulePlugin.prototype.registerModuleEntry = function (compiler) {
-  var thisContext = this;
-  this.pageModules.forEach(function (page) {
-    //添加页面js
-    thisContext.addSingleEntry(compiler, thisContext.getModuleFullPath(page), page);
-  })
-  //将wxss 以及json以及wxml等文件添加到一个entry中
-  compiler.apply(new MultiEntryPlugin(this.projectRoot, this.resourceModules, RESOUR_CHUNK_NAME))
+ModuleDependencyTemplateAsResolveName.prototype.relativeResolve  =function(sourcePath,resource){
+    sourcePath = sourcePath.split('!').pop();
+    sourcePath = path.dirname(sourcePath)
+    var content = path.relative(sourcePath, resource)
+    var extName = path.extname(resource)
+    var info = path.parse(content)
+    extName = extName !== '.js' ? extName + '.js' : extName;
+    content = path.join(info.dir, info.name + extName)
+    content = content.replace(/\\/g,'/').replace(/\.\.\/node_modules/, 'node_modules')
+    content = './' + content.replace(/\\/g, '/')
+    return content;
 }
 
 /**
- * 自定义webpack entry 
- * 目标：实现打包服务端代码，entry不再合并成一个文件，而是保留原始目录结构到目标目录
+ * 静态资源 require require('./a.jpg')
  */
-WxAppModulePlugin.prototype.registerChunks = function (compilation) {
-  var thisContext = this
-  compilation.plugin('optimize-chunks', function (chunks) {
-    thisContext.extraChunks = {};
-    this.chunks = [];
-    this.entrypoints = {};
-    this.namedChunks = {};
-    var outputOptions = this.outputOptions
-    var addChunk = this.addChunk.bind(this)
-    chunks.filter(function (chunk) {
-      return chunk.hasRuntime() && chunk.name
-    }).map(function (chunk) {
-      chunk.forEachModule(function (mod) {
-        if (mod.userRequest) {
-          thisContext.handleAddChunk(addChunk, mod, chunk, compilation)
-        }
-      })
-    })
-  })
+ModuleDependencyTemplateAsResolveName.prototype.assetsResolve  =function(request,extName){
+    var info = path.parse(request)
+    request = path.join(info.dir, info.name + extName + '.js')
+    return request.replace(/\\/g, '/')
 }
 
 /**
- * 处理文件输出
+ * 模块下文件引用处理 require('webpack/lib/NormalModule.js')
  */
-WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, compilation) {
-  var info = path.parse(path.relative(this.projectRoot, mod.userRequest));
-  var name = path.join(info.dir, info.name).replace(/\\/g, '/').replace(/\.\.\/node_modules/, 'node_modules')
-  var nameWith = name + info.ext;
-  var newChunk = this.extraChunks[nameWith]
-  if (chunk.name === RESOUR_CHUNK_NAME) {
-    return;
-  }
-  if (nameWith.indexOf("node_modules") > -1) {
-    name = name.replace("node_modules", this.nodeModulesName);
-  }
-  name = name + info.ext;
-  if (!newChunk) {
-    mod.variables = [];
-    var entrypoint = new Entrypoint(name)
-    newChunk = this.extraChunks[nameWith] = addChunk(name)
-    entrypoint.chunks.push(newChunk)
-    newChunk.entrypoints = [entrypoint]
-  }
-  newChunk.addModule(mod)
-  mod.addChunk(newChunk)
-  mod.removeChunk(chunk)
+ModuleDependencyTemplateAsResolveName.prototype.moduleFileResolve  =function(content,resource,extName,sourcePath){
+    var resolve = (extName=='.js'? resource: require.resolve(content)).replace(/\\/g, '/');
+    return this.relativeResolve(sourcePath,resolve);
 }
 
-/**
- * 自定义webpack ModuleTemplate.render 
- * 改成打包目标文件保留原生nodejs风格
- */
-WxAppModulePlugin.prototype.registerModuleTemplate = function (compilation) {
-  var cdnName = this.cdnName;
-  var outputOptions = compilation.outputOptions;
-  var publicPath = outputOptions.publicPath;
-  var replacement = this.replacement.bind(this);
-  compilation.mainTemplate.plugin('render', function (bootstrapSource, chunk, hash, moduleTemplate, dependencyTemplates) {
-    var source = new ConcatSource()
-    chunk.forEachModule(function (module) {
-      var ext = path.extname(module.userRequest)
-      var assets = Object.keys(module.assets || {});
-      var moduleSource = null
-      switch (ext) {
-        case '.json':
-          moduleSource = module._source
-          break
-        default:
-          moduleSource = module.source(dependencyTemplates, moduleTemplate.outputOptions, moduleTemplate.requestShortener)
-          break
-      }
-      replacement(moduleSource);
-      source.add(moduleSource)
-    })
-    return source
-  })
+// 覆盖默认模板
+CommonJsRequireDependency.Template = ModuleDependencyTemplateAsResolveName
+HarmonyImportDependency.Template = ModuleDependencyTemplateAsResolveName;
+
+module.exports.setOptions = function (options) {
+  Nodes_Module_Name = options.nodeModulesName;
 }
-
-/**
- * 注册normal module loader
- */
-WxAppModulePlugin.prototype.registerNormalModuleLoader = function (compilation) {
-  compilation.plugin("normal-module-loader", function (loaderContext, module) {
-    var exec = loaderContext.exec.bind(loaderContext)
-    loaderContext.exec = function (code, filename) {
-      return exec(code, filename.split('!').pop());
-    }
-  });
-}
-
-/**
- * 替换 __webpack_require
- */
-WxAppModulePlugin.prototype.replacement = function (moduleSource) {
-  var replacements = moduleSource.replacements || [];
-  replacements.forEach(function (rep) {
-    var v = rep[2] || "";
-    var isVar = v.indexOf("WEBPACK VAR INJECTION") > -1;
-    v = isVar ? "" : v.replace(/__webpack_require__/g, 'require');
-    if (v.indexOf("AMD") > -1) {
-      v = "";
-    }
-    rep[2] = v;
-  })
-}
-
-/**
- * 添加一个single entry
- * @param {Compiler} compiler webpack编译器
- * @param {*} entry 模块完整路径
- * @param {*} name  entry名称
- */
-WxAppModulePlugin.prototype.addSingleEntry = function (compiler, entry, name) {
-  var base = this.projectRoot;
-  compiler.plugin('make', function (compilation, callback) {
-    const dep = SingleEntryPlugin.createDependency(entry, name);
-    compilation.addEntry(base, dep, name, callback);
-  });
-}
-
-/**
- * 获取模块的完整路径
- */
-WxAppModulePlugin.prototype.getModuleFullPath = function (entry) {
-  return path.join(this.projectRoot, entry)
-}
-
-/**
- * 读取Json文件，如果文件不存在，则返回{}
- */
-WxAppModulePlugin.prototype.requireJson = function (file) {
-  return fse.existsSync(file) ? fse.readJSONSync(file) : {};
-}
-
-
-module.exports = WxAppModulePlugin;
