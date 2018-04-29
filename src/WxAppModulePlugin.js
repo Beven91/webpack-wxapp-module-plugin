@@ -36,6 +36,7 @@ function WxAppModulePlugin(projectRoot, nodeModulesName, extensions) {
   this.projectRoot = projectRoot;
   this.resourceModules = [];
   this.pageModules = [];
+  this.jsonAssets = [];
   this.nodeModulesName = nodeModulesName || "app_node_modules";
   this.Resolve = require('./dependencies/ModuleDependencyTemplateAsResolveName.js');
   this.Template = require('./dependencies/NodeRequireHeaderDependencyTemplate.js')
@@ -49,6 +50,8 @@ WxAppModulePlugin.prototype.apply = function (compiler) {
     thisContext.initPageModules();
     // 自动根据app.js作为入口，分析哪些文件需要单独产出，以及node_modules使用了哪些模块
     thisContext.registerModuleEntry(compiler)
+    //处理页面相关.json
+    thisContext.registerAssets(compiler);
     //单文件模块与node_modules模块处理
     thisContext.registerChunks(compilation);
     // 自定义js打包模板渲染 取消webpackrequire机制，改成纯require
@@ -89,6 +92,8 @@ WxAppModulePlugin.prototype.initPageModules = function () {
   this.pushTabBarIcons(config, resourceModules);
   //过滤掉不存在文件
   this.resourceModules = resourceModules.filter(fse.existsSync.bind(fse));
+  this.jsonAssets = resourceModules.filter((file) => path.extname(file) === '.json');
+  //this.resourceModules = resourceModules.filter((file) => path.extname(file) !== '.json');
   this.pageModules = pageModules;
 }
 
@@ -169,21 +174,46 @@ WxAppModulePlugin.prototype.registerChunks = function (compilation) {
   var thisContext = this
   compilation.plugin('optimize-chunks', function (chunks) {
     thisContext.extraChunks = {};
-    this.chunks = [];
-    this.entrypoints = {};
-    this.namedChunks = {};
-    var outputOptions = this.outputOptions
-    var addChunk = this.addChunk.bind(this)
+    compilation.chunks = [];
+    compilation.entrypoints.clear();
+    //compilation.namedChunks = {};
+    var outputOptions = compilation.outputOptions
+    var addChunk = compilation.addChunk.bind(compilation)
     chunks.filter(function (chunk) {
       return chunk.hasRuntime() && chunk.name
     }).map(function (chunk) {
-      chunk.forEachModule(function (mod) {
+      chunk.modulesIterable.forEach(function (mod) {
         if (mod.userRequest) {
           thisContext.handleAddChunk(addChunk, mod, chunk, compilation)
         }
       })
     })
   })
+}
+
+/**
+ * 处理json文件复制
+ */
+WxAppModulePlugin.prototype.registerAssets = function (compiler) {
+  var thisContext = this;
+  compiler.plugin('emit', function (compilation, cb) {
+    thisContext.jsonAssets.forEach(function (file) {
+      var outputPath = path.dirname(file);
+      var name = path.relative(thisContext.projectRoot,file);
+      var data = fse.readJsonSync(file);
+      var content = JSON.stringify(data, null, 4);
+      var size = content.length;
+      compilation.assets[name] = {
+        size: function () {
+          return size;
+        },
+        source: function () {
+          return content;
+        }
+      };
+    })
+    cb();
+  });
 }
 
 /**
@@ -206,7 +236,7 @@ WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, com
     var entrypoint = new Entrypoint(name)
     newChunk = this.extraChunks[nameWith] = addChunk(name)
     entrypoint.chunks.push(newChunk)
-    newChunk.entrypoints = [entrypoint]
+    newChunk.addGroup(entrypoint);
   }
   newChunk.addModule(mod)
   mod.addChunk(newChunk)
@@ -224,7 +254,7 @@ WxAppModulePlugin.prototype.registerModuleTemplate = function (compilation) {
   var replacement = this.replacement.bind(this);
   compilation.mainTemplate.plugin('render', function (bootstrapSource, chunk, hash, moduleTemplate, dependencyTemplates) {
     var source = new ConcatSource()
-    chunk.forEachModule(function (module) {
+    chunk.modulesIterable.forEach(function (module) {
       var ext = path.extname(module.userRequest)
       var assets = Object.keys(module.assets || {});
       var moduleSource = null

@@ -1,6 +1,6 @@
 {
   "name": "webpack-wxapp-module-plugin",
-  "version": "0.1.10",
+  "version": "2.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -16,7 +16,7 @@
   },
   "homepage": "https://github.com/Beven91/webpack-wxapp-module-plugin#readme",
   "dependencies": {
-    "fs-extra": "^3.0.1",
+    "fs-extra": "^5.0.0",
     "webpack-sources": "^1.1.0"
   }
 }
