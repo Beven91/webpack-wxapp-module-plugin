@@ -176,6 +176,7 @@ WxAppModulePlugin.prototype.registerChunks = function (compilation) {
     thisContext.extraChunks = {};
     compilation.chunks = [];
     compilation.entrypoints.clear();
+    compilation.namedChunks.clear();
     //compilation.namedChunks = {};
     var outputOptions = compilation.outputOptions
     var addChunk = compilation.addChunk.bind(compilation)
@@ -238,9 +239,13 @@ WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, com
     entrypoint.chunks.push(newChunk)
     newChunk.addGroup(entrypoint);
   }
-  newChunk.addModule(mod)
-  mod.addChunk(newChunk)
-  mod.removeChunk(chunk)
+  if (newChunk) {
+    newChunk.addModule(mod)
+    mod.addChunk(newChunk)
+  }
+  if(newChunk !== chunk){
+    mod.removeChunk(chunk)
+  }
 }
 
 /**
