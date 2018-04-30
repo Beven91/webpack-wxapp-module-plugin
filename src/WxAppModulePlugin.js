@@ -27,25 +27,28 @@ HarmonyDetectionParserPlugin.prototype.apply = function () {
 
 /**
  * 微信小程序模块打包插件
- * @param {String} projectRoot 微信小程序app.js所在的目录
+ * @param {String} nodeModulesName node_modules打包后的目录名
+ * @param {Array} extensions 扩展名列表，用于插件查找那些后缀的页面资源需要打包
+ *               例如默认会附加以下资源: page.wxml page.json page.wxss 
+ *               如果需要附加其他页面资源 例如 page.scss 那么可以配置['.scss']
  */
-function WxAppModulePlugin(projectRoot, nodeModulesName, extensions) {
+function WxAppModulePlugin(nodeModulesName, extensions) {
   this.extraChunks = {}
   this.extraPackage = {};
   this.typedExtensions = ['.wxml', '.wxss', '.json'].concat(extensions || []);
-  this.projectRoot = projectRoot;
   this.resourceModules = [];
   this.pageModules = [];
   this.jsonAssets = [];
   this.nodeModulesName = nodeModulesName || "app_node_modules";
   this.Resolve = require('./dependencies/ModuleDependencyTemplateAsResolveName.js');
   this.Template = require('./dependencies/NodeRequireHeaderDependencyTemplate.js')
-  this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName })
 }
 
 WxAppModulePlugin.prototype.apply = function (compiler) {
   var thisContext = this
   this.options = compiler.options;
+  this.projectRoot = this.options.context;
+  this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName,projectRoot:this.projectRoot })
   compiler.plugin('this-compilation', function (compilation) {
     thisContext.initPageModules();
     // 自动根据app.js作为入口，分析哪些文件需要单独产出，以及node_modules使用了哪些模块
@@ -222,7 +225,7 @@ WxAppModulePlugin.prototype.registerAssets = function (compiler) {
  */
 WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, compilation) {
   var info = path.parse(path.relative(this.projectRoot, mod.userRequest));
-  var name = path.join(info.dir, info.name).replace(/\\/g, '/').replace(/\.\.\/node_modules/, 'node_modules')
+  var name = path.join(info.dir, info.name).replace(/\\/g, '/').replace(/\.\.\//g, '')
   var nameWith = name + info.ext;
   var newChunk = this.extraChunks[nameWith]
   if (chunk.name === RESOUR_CHUNK_NAME) {
