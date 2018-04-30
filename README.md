@@ -30,6 +30,7 @@ var WxappModulePlugin  =require('webpack-wxapp-module-plugin');
 var appjsRoot = path.resolve('');
 
 module.exports = {
+  context:appjsRoot,
   entry: {
     'app': ['./app.js']
   },
@@ -39,7 +40,7 @@ module.exports = {
     libraryTarget: 'commonjs2'
   },
   plugins:[
-    new WxappModulePlugin(appjsRoot,'指定node_modules模块打包后的存放目录名称，例如:vendor')
+    new WxappModulePlugin('指定node_modules模块打包后的存放目录名称，例如:vendor')
   ]
 }
 ```
