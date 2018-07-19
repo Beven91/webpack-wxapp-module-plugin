@@ -48,7 +48,7 @@ WxAppModulePlugin.prototype.apply = function (compiler) {
   var thisContext = this
   this.options = compiler.options;
   this.projectRoot = this.options.context;
-  this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName,projectRoot:this.projectRoot })
+  this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName, projectRoot: this.projectRoot })
   compiler.plugin('this-compilation', function (compilation) {
     thisContext.initPageModules();
     // 自动根据app.js作为入口，分析哪些文件需要单独产出，以及node_modules使用了哪些模块
@@ -68,36 +68,49 @@ WxAppModulePlugin.prototype.apply = function (compiler) {
  * 初始化小程序引用的页面以及组件与对应的资源文件例如:.json .wxss .wxml,tabBarIcons
  */
 WxAppModulePlugin.prototype.initPageModules = function () {
-  var resourceModules = [path.join(this.projectRoot, 'project.config.json')];
-  var pageModules = [];
-  var thisContext = this;
-  var typedExtensions = this.typedExtensions
-  var config = fse.readJsonSync(path.join(this.projectRoot, 'app.json'));
-  var pages = ['app'].concat(this.searchSubPackages(config, config.pages));
-  pages.forEach(function (page) {
-    var modulePath = thisContext.getModuleFullPath(page);
-    var parts = path.parse(modulePath);
-    var namePath = path.join(parts.dir, parts.name);
-    //附加页面引用的所有组件
-    thisContext.pushComponents(pages, modulePath, namePath);
-  })
-  pages.forEach(function (page) {
-    var modulePath = thisContext.getModuleFullPath(page);
-    var parts = path.parse(modulePath);
-    var namePath = path.join(parts.dir, parts.name);
-    //搜索当前页面对应的资源文件
-    resourceModules = resourceModules.concat(typedExtensions.map(function (ext) { return namePath + ext; }))
-    if (page !== 'app') {
-      pageModules.push(page + '.js');
-    }
-  })
-  //导出app.json配置的图片
-  this.pushTabBarIcons(config, resourceModules);
-  //过滤掉不存在文件
-  this.resourceModules = resourceModules.filter(fse.existsSync.bind(fse));
-  this.jsonAssets = resourceModules.filter((file) => path.extname(file) === '.json');
-  //this.resourceModules = resourceModules.filter((file) => path.extname(file) !== '.json');
-  this.pageModules = pageModules;
+  var config = this.getJson(path.join(this.projectRoot, 'app.json'));
+  if (config) {
+    var resourceModules = [path.join(this.projectRoot, 'project.config.json')];
+    var pageModules = [];
+    var thisContext = this;
+    var typedExtensions = this.typedExtensions
+    var pages = ['app'].concat(this.searchSubPackages(config, config.pages));
+    pages.forEach(function (page) {
+      var modulePath = thisContext.getModuleFullPath(page);
+      var parts = path.parse(modulePath);
+      var namePath = path.join(parts.dir, parts.name);
+      //附加页面引用的所有组件
+      thisContext.pushComponents(pages, modulePath, namePath);
+    })
+    pages.forEach(function (page) {
+      var modulePath = thisContext.getModuleFullPath(page);
+      var parts = path.parse(modulePath);
+      var namePath = path.join(parts.dir, parts.name);
+      //搜索当前页面对应的资源文件
+      resourceModules = resourceModules.concat(typedExtensions.map(function (ext) { return namePath + ext; }))
+      if (page !== 'app') {
+        pageModules.push(page + '.js');
+      }
+    })
+    //导出app.json配置的图片
+    this.pushTabBarIcons(config, resourceModules);
+    //过滤掉不存在文件
+    this.resourceModules = resourceModules.filter(fse.existsSync.bind(fse));
+    this.jsonAssets = resourceModules.filter((file) => path.extname(file) === '.json');
+    //this.resourceModules = resourceModules.filter((file) => path.extname(file) !== '.json');
+    this.pageModules = pageModules;
+  }
+}
+
+/**
+ * 安全方式读取json
+ */
+WxAppModulePlugin.prototype.getJson = function (file) {
+  try {
+    return fse.readJsonSync(file);
+  } catch (ex) {
+    return null;
+  }
 }
 
 /**
@@ -148,10 +161,10 @@ WxAppModulePlugin.prototype.pushTabBarIcons = function (config, resourceModules)
   var projectRoot = this.projectRoot;
   tabBarList.forEach(function (tabBarItem) {
     if (tabBarItem.iconPath) {
-      resourceModules.push(projectRoot, path.join(tabBarItem.iconPath))
+      resourceModules.push(path.join(projectRoot,tabBarItem.iconPath))
     }
     if (tabBarItem.selectedIconPath) {
-      resourceModules.push(projectRoot, path.join(tabBarItem.selectedIconPath))
+      resourceModules.push(path.join(projectRoot,tabBarItem.selectedIconPath))
     }
   })
 }
@@ -203,7 +216,7 @@ WxAppModulePlugin.prototype.registerAssets = function (compiler) {
   compiler.plugin('emit', function (compilation, cb) {
     thisContext.jsonAssets.forEach(function (file) {
       var outputPath = path.dirname(file);
-      var name = path.relative(thisContext.projectRoot,file);
+      var name = path.relative(thisContext.projectRoot, file);
       var data = fse.readJsonSync(file);
       var content = JSON.stringify(data, null, 4);
       var size = content.length;
@@ -246,7 +259,7 @@ WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, com
     newChunk.addModule(mod)
     mod.addChunk(newChunk)
   }
-  if(newChunk !== chunk){
+  if (newChunk !== chunk) {
     mod.removeChunk(chunk)
   }
 }
