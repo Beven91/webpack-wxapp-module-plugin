@@ -7,6 +7,7 @@
 var path = require('path')
 var CommonJsRequireDependency = require('webpack/lib/dependencies/CommonJsRequireDependency.js')
 var HarmonyImportDependency = require('webpack/lib/dependencies/HarmonyImportDependency.js')
+var NameResolve = require('./NameResolve');
 
 var resolveExtensions = [];
 var Nodes_Module_Name = "";
@@ -50,7 +51,7 @@ ModuleDependencyTemplateAsResolveName.prototype.apply = function (dep, source, o
   } else {
     content = this.relativeResolve(sourcePath, resource)
   }
-  content = content.replace("node_modules", Nodes_Module_Name);
+  content = NameResolve.getChunkName(content, Nodes_Module_Name);
   if (dep.type === 'harmony import') {
     var prefix = original.split(' from ')[0];
     source.replace(dep.range[0], dep.range[1] - 1, prefix + ' from  \'' + content + '\'');
@@ -79,8 +80,8 @@ ModuleDependencyTemplateAsResolveName.prototype.relativeResolve = function (sour
   sourcePath = sourcePath.split('!').pop();
   sourcePath = path.dirname(sourcePath)
   var relRequire = path.relative(ProjectRoot, resource).replace(/\\/g, '/').replace(/\.\.\//g, '');
-  var relContext = path.relative(ProjectRoot,sourcePath).replace(/\\/g, '/').replace(/\.\.\//g, '');
-  var targetContext = path.join(ProjectRoot,relContext);
+  var relContext = path.relative(ProjectRoot, sourcePath).replace(/\\/g, '/').replace(/\.\.\//g, '');
+  var targetContext = path.join(ProjectRoot, relContext);
   var targetResource = path.join(ProjectRoot, relRequire);
   var content = path.relative(targetContext, targetResource)
   var extName = path.extname(resource)

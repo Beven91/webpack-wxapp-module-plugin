@@ -14,6 +14,7 @@ var SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
 var MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin');
 var HarmonyDetectionParserPlugin = require("webpack/lib/dependencies/HarmonyDetectionParserPlugin")
 var ConcatSource = require('webpack-sources').ConcatSource
+var NameResolve = require('./dependencies/NameResolve');
 
 var RESOUR_CHUNK_NAME = "@@RESOURCEENTRY@@";
 
@@ -142,8 +143,15 @@ WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePa
   var components = this.requireJson(namePath + '.json').usingComponents || {};
   var moduleDir = path.dirname(modulePath);
   for (var name in components) {
-    var componentPath = path.join(moduleDir, components[name]);
-    var componentEntry = path.relative(this.projectRoot, componentPath).toLowerCase();
+    var usingPath = components[name];
+    var isNodeModules = usingPath.indexOf('node_modules/') === 0;
+    var componentEntry = null;
+    if (!isNodeModules) {
+      var componentPath = path.join(moduleDir, usingPath);
+      componentEntry = path.relative(this.projectRoot, componentPath).toLowerCase();
+    } else {
+      componentEntry = require.resolve(usingPath.replace('node_modules/', '')).replace('.js', '');
+    }
     if (pages.indexOf(componentEntry) < 0) {
       pages.push(componentEntry);
     }
@@ -218,8 +226,17 @@ WxAppModulePlugin.prototype.registerAssets = function (compiler) {
       var outputPath = path.dirname(file);
       var name = path.relative(thisContext.projectRoot, file);
       var data = fse.readJsonSync(file);
+      var usingComponents = data.usingComponents;
+      if (usingComponents) {
+        const usingKeys = Object.keys(usingComponents);
+        usingKeys.forEach(function (using) {
+          const usingPath = usingComponents[using];
+          usingComponents[using] = '/' + NameResolve.getChunkName(usingPath, thisContext.nodeModulesName)
+        })
+      }
       var content = JSON.stringify(data, null, 4);
       var size = content.length;
+      name = NameResolve.getChunkName(name, thisContext.nodeModulesName)
       compilation.assets[name] = {
         size: function () {
           return size;
@@ -245,7 +262,7 @@ WxAppModulePlugin.prototype.renderAssets = function (compilation) {
     if (name.indexOf('node_modules') > -1) {
       const value = allAssets[name];
       delete allAssets[name];
-      name = name.replace("node_modules", nodeModulesName);
+      name = NameResolve.getChunkName(name, nodeModulesName);
       name = nodeModulesName + name.split(nodeModulesName).slice(1);
       allAssets[name] = value;
     }
@@ -264,7 +281,7 @@ WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, com
     return;
   }
   if (nameWith.indexOf("node_modules") > -1) {
-    name = name.replace("node_modules", this.nodeModulesName);
+    name = NameResolve.getChunkName(name, this.nodeModulesName)
   }
   name = name + info.ext;
   if (!newChunk) {
@@ -359,7 +376,7 @@ WxAppModulePlugin.prototype.addSingleEntry = function (compiler, entry, name) {
  * 获取模块的完整路径
  */
 WxAppModulePlugin.prototype.getModuleFullPath = function (entry) {
-  return path.join(this.projectRoot, entry)
+  return path.isAbsolute(entry) ? entry : path.join(this.projectRoot, entry)
 }
 
 /**
