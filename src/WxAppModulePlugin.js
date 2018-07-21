@@ -161,10 +161,10 @@ WxAppModulePlugin.prototype.pushTabBarIcons = function (config, resourceModules)
   var projectRoot = this.projectRoot;
   tabBarList.forEach(function (tabBarItem) {
     if (tabBarItem.iconPath) {
-      resourceModules.push(path.join(projectRoot,tabBarItem.iconPath))
+      resourceModules.push(path.join(projectRoot, tabBarItem.iconPath))
     }
     if (tabBarItem.selectedIconPath) {
-      resourceModules.push(path.join(projectRoot,tabBarItem.selectedIconPath))
+      resourceModules.push(path.join(projectRoot, tabBarItem.selectedIconPath))
     }
   })
 }
@@ -229,8 +229,27 @@ WxAppModulePlugin.prototype.registerAssets = function (compiler) {
         }
       };
     })
+    thisContext.renderAssets(compilation);
     cb();
   });
+}
+
+/**
+ * 处理assets 
+ */
+WxAppModulePlugin.prototype.renderAssets = function (compilation) {
+  const allAssets = compilation.assets;
+  const keys = Object.keys(allAssets);
+  const nodeModulesName = this.nodeModulesName;
+  keys.forEach(function (name) {
+    if (name.indexOf('node_modules') > -1) {
+      const value = allAssets[name];
+      delete allAssets[name];
+      name = name.replace("node_modules", nodeModulesName);
+      name = nodeModulesName + name.split(nodeModulesName).slice(1);
+      allAssets[name] = value;
+    }
+  })
 }
 
 /**
