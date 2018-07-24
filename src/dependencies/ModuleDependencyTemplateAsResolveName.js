@@ -51,7 +51,11 @@ ModuleDependencyTemplateAsResolveName.prototype.apply = function (dep, source, o
   } else {
     content = this.relativeResolve(sourcePath, resource)
   }
-  content = NameResolve.getChunkName(content, Nodes_Module_Name);
+  if (content.indexOf('css-loader') > -1) {
+    content = this.absoluteResolve(content, sourcePath);
+  } else {
+    content = NameResolve.getChunkName(content, Nodes_Module_Name);
+  }
   if (dep.type === 'harmony import') {
     var prefix = original.split(' from ')[0];
     source.replace(dep.range[0], dep.range[1] - 1, prefix + ' from  \'' + content + '\'');
