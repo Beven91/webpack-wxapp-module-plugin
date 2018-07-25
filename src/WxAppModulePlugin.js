@@ -8,7 +8,6 @@
 var path = require('path')
 var fse = require('fs-extra');
 var Entrypoint = require('webpack/lib/Entrypoint')
-var NormalModule = require('webpack/lib/NormalModule.js')
 var AMDPlugin = require('webpack/lib/dependencies/AMDPlugin.js')
 var SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
 var MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin');
@@ -273,8 +272,8 @@ WxAppModulePlugin.prototype.renderAssets = function (compilation) {
  * 处理文件输出
  */
 WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, compilation) {
-  var info = path.parse(path.relative(this.projectRoot, mod.userRequest));
-  var name = path.join(info.dir, info.name).replace(/\\/g, '/').replace(/\.\.\//g, '')
+  var info = path.parse(NameResolve.getProjectRelative(this.projectRoot, mod.userRequest));
+  var name = path.join(info.dir, info.name);
   var nameWith = name + info.ext;
   var newChunk = this.extraChunks[nameWith]
   if (chunk.name === RESOUR_CHUNK_NAME) {

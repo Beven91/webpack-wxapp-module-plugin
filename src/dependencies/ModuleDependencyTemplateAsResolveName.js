@@ -9,10 +9,8 @@ var CommonJsRequireDependency = require('webpack/lib/dependencies/CommonJsRequir
 var HarmonyImportDependency = require('webpack/lib/dependencies/HarmonyImportDependency.js')
 var NameResolve = require('./NameResolve');
 
-var resolveExtensions = [];
 var Nodes_Module_Name = "";
 var ProjectRoot = null;
-var ORIGINAL_REQUIRE_JS = require.extensions['.js'];
 
 /**
  * webpack require 使用模块名称作为模块标识
@@ -83,11 +81,9 @@ ModuleDependencyTemplateAsResolveName.prototype.absoluteResolve = function (cont
 ModuleDependencyTemplateAsResolveName.prototype.relativeResolve = function (sourcePath, resource) {
   sourcePath = sourcePath.split('!').pop();
   sourcePath = path.dirname(sourcePath)
-  var relRequire = path.relative(ProjectRoot, resource).replace(/\\/g, '/').replace(/\.\.\//g, '');
-  var relContext = path.relative(ProjectRoot, sourcePath).replace(/\\/g, '/').replace(/\.\.\//g, '');
-  var targetContext = path.join(ProjectRoot, relContext);
-  var targetResource = path.join(ProjectRoot, relRequire);
-  var content = path.relative(targetContext, targetResource)
+  var movedSourcePath = NameResolve.moveToProjectRoot(ProjectRoot, sourcePath);
+  var movedSource = NameResolve.moveToProjectRoot(ProjectRoot,resource);
+  var content = path.relative(movedSourcePath, movedSource)
   var extName = path.extname(resource)
   var info = path.parse(content)
   extName = extName !== '.js' ? extName + '.js' : extName;
