@@ -223,7 +223,7 @@ WxAppModulePlugin.prototype.registerAssets = function (compiler) {
   compiler.plugin('emit', function (compilation, cb) {
     thisContext.jsonAssets.forEach(function (file) {
       var outputPath = path.dirname(file);
-      var name = path.relative(thisContext.projectRoot, file);
+      var name =  NameResolve.getProjectRelative(thisContext.projectRoot, file);
       var data = fse.readJsonSync(file);
       var usingComponents = data.usingComponents;
       if (usingComponents) {
