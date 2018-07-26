@@ -10,7 +10,12 @@ function NameResolve(nodeModulesName) {
  * @param {*} nodeModulesName 
  */
 NameResolve.prototype.getChunkName = function (name, nodeModulesName) {
-  return (name || '').replace("node_modules", nodeModulesName);
+  name = name || '';
+  if (name.indexOf("node_modules") === 0) {
+    return '/' + (name || '').replace("node_modules", nodeModulesName);
+  } else {
+    return (name || '').replace("node_modules", nodeModulesName);
+  }
 }
 
 /**
@@ -28,7 +33,7 @@ NameResolve.prototype.getProjectRelative = function (projectRoot, source) {
  * @param {*} projectRoot  根目录
  * @param {*} source 资源文件目录
  */
-NameResolve.prototype.moveToProjectRoot = function (projectRoot,source) {
+NameResolve.prototype.moveToProjectRoot = function (projectRoot, source) {
   return path.join(projectRoot, path.relative(projectRoot, source).replace(/(\.\.\\)|(\.\.\/)/g, ''));
 }
 

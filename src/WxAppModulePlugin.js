@@ -153,6 +153,10 @@ WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePa
     }
     if (pages.indexOf(componentEntry) < 0) {
       pages.push(componentEntry);
+      const full = this.getModuleFullPath(componentEntry);
+      var parts = path.parse(full);
+      var namePath = path.join(parts.dir, parts.name);
+      this.pushComponents(pages, full, namePath)
     }
   }
 }
@@ -221,16 +225,25 @@ WxAppModulePlugin.prototype.registerChunks = function (compilation) {
 WxAppModulePlugin.prototype.registerAssets = function (compiler) {
   var thisContext = this;
   compiler.plugin('emit', function (compilation, cb) {
+    var cache = compilation.cache || {};
+    var cacheKeys = Object.keys(cache);
     thisContext.jsonAssets.forEach(function (file) {
       var outputPath = path.dirname(file);
-      var name =  NameResolve.getProjectRelative(thisContext.projectRoot, file);
+      var name = NameResolve.getProjectRelative(thisContext.projectRoot, file);
       var data = fse.readJsonSync(file);
       var usingComponents = data.usingComponents;
+      var cacheKey = cacheKeys.filter(function (key) {
+        return cache[key].resource === file;
+      })
+      var cacheAsset = cache[cacheKey];
+      if (cacheAsset && !cacheAsset.built) {
+        return;
+      }
       if (usingComponents) {
         const usingKeys = Object.keys(usingComponents);
         usingKeys.forEach(function (using) {
           const usingPath = usingComponents[using];
-          usingComponents[using] = '/' + NameResolve.getChunkName(usingPath, thisContext.nodeModulesName)
+          usingComponents[using] = NameResolve.getChunkName(usingPath, thisContext.nodeModulesName)
         })
       }
       var content = JSON.stringify(data, null, 4);
