@@ -39,6 +39,7 @@ function WxAppModulePlugin(nodeModulesName, extensions) {
   this.resourceModules = [];
   this.pageModules = [];
   this.jsonAssets = [];
+  this.linkNames = {};
   this.nodeModulesName = nodeModulesName || "app_node_modules";
   this.Resolve = require('./dependencies/ModuleDependencyTemplateAsResolveName.js');
   this.Template = require('./dependencies/NodeRequireHeaderDependencyTemplate.js')
@@ -149,7 +150,7 @@ WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePa
       var componentPath = path.join(moduleDir, usingPath);
       componentEntry = path.relative(this.projectRoot, componentPath).toLowerCase();
     } else {
-      componentEntry = this.resolveModule(modulePath, usingPath.replace('node_modules/', '')).replace('.js', '');
+      componentEntry = this.resolveModule(modulePath, usingPath).replace('.js', '');
     }
     if (pages.indexOf(componentEntry) < 0) {
       pages.push(componentEntry);
@@ -161,7 +162,7 @@ WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePa
   }
 }
 
-WxAppModulePlugin.prototype.resolveModule = function (context, request) {
+WxAppModulePlugin.prototype.resolveModule = function (context, usingPath) {
   const segments = context.split(path.sep);
   const paths = [];
   while (segments.length > 0) {
@@ -169,8 +170,13 @@ WxAppModulePlugin.prototype.resolveModule = function (context, request) {
     paths.push(m);
     segments.pop();
   }
+  const request = usingPath.replace('node_modules/', '');
   module.paths.unshift.apply(module.paths, paths);
   const full = require.resolve(request);
+  const nodeModulesName = full.replace(/\\/g, '/').split('/'+request).shift().split('/').pop();
+  if (nodeModulesName !== 'node_modules') {
+    this.linkNames[usingPath] = '/'+nodeModulesName + '/' + request;
+  }
   module.paths.splice(0, paths.length);
   return full;
 }
@@ -257,7 +263,8 @@ WxAppModulePlugin.prototype.registerAssets = function (compiler) {
         const usingKeys = Object.keys(usingComponents);
         usingKeys.forEach(function (using) {
           const usingPath = usingComponents[using];
-          usingComponents[using] = NameResolve.getChunkName(usingPath, thisContext.nodeModulesName)
+          const linkName = thisContext.linkNames[usingPath];
+          usingComponents[using] = linkName ? linkName : NameResolve.getChunkName(usingPath, thisContext.nodeModulesName)
         })
       }
       var content = JSON.stringify(data, null, 4);
@@ -291,10 +298,10 @@ WxAppModulePlugin.prototype.renderAssets = function (compilation) {
       name = NameResolve.getChunkName(name, nodeModulesName);
       name = nodeModulesName + name.split(nodeModulesName).slice(1);
       allAssets[name] = value;
-    }else if(name.indexOf('_/')>-1){
+    } else if (name.indexOf('_/') > -1) {
       const value = allAssets[name];
       delete allAssets[name];
-      name = name.replace(/_\//g,'');
+      name = name.replace(/_\//g, '');
       allAssets[name] = value;
     }
   })
