@@ -291,6 +291,11 @@ WxAppModulePlugin.prototype.renderAssets = function (compilation) {
       name = NameResolve.getChunkName(name, nodeModulesName);
       name = nodeModulesName + name.split(nodeModulesName).slice(1);
       allAssets[name] = value;
+    }else if(name.indexOf('_/')>-1){
+      const value = allAssets[name];
+      delete allAssets[name];
+      name = name.replace(/_\//g,'');
+      allAssets[name] = value;
     }
   })
 }
