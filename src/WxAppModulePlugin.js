@@ -48,7 +48,7 @@ WxAppModulePlugin.prototype.apply = function (compiler) {
   var thisContext = this
   this.options = compiler.options;
   this.projectRoot = this.options.context;
-  this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName, projectRoot: this.projectRoot })
+  this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName, projectRoot: this.projectRoot });
   compiler.plugin('this-compilation', function (compilation) {
     thisContext.initPageModules();
     // 自动根据app.js作为入口，分析哪些文件需要单独产出，以及node_modules使用了哪些模块
@@ -149,7 +149,7 @@ WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePa
       var componentPath = path.join(moduleDir, usingPath);
       componentEntry = path.relative(this.projectRoot, componentPath).toLowerCase();
     } else {
-      componentEntry = require.resolve(usingPath.replace('node_modules/', '')).replace('.js', '');
+      componentEntry = this.resolveModule(modulePath, usingPath.replace('node_modules/', '')).replace('.js', '');
     }
     if (pages.indexOf(componentEntry) < 0) {
       pages.push(componentEntry);
@@ -159,6 +159,20 @@ WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePa
       this.pushComponents(pages, full, namePath)
     }
   }
+}
+
+WxAppModulePlugin.prototype.resolveModule = function (context, request) {
+  const segments = context.split(path.sep);
+  const paths = [];
+  while (segments.length > 0) {
+    const m = path.join(segments.join(path.sep), 'node_modules');
+    paths.push(m);
+    segments.pop();
+  }
+  module.paths.unshift.apply(module.paths, paths);
+  const full = require.resolve(request);
+  module.paths.splice(0, paths.length);
+  return full;
 }
 
 /**
