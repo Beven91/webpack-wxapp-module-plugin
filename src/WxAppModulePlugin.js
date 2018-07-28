@@ -51,17 +51,21 @@ WxAppModulePlugin.prototype.apply = function (compiler) {
   this.projectRoot = this.options.context;
   this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName, projectRoot: this.projectRoot });
   compiler.plugin('this-compilation', function (compilation) {
-    thisContext.initPageModules();
-    // 自动根据app.js作为入口，分析哪些文件需要单独产出，以及node_modules使用了哪些模块
-    thisContext.registerModuleEntry(compiler)
-    //处理页面相关.json
-    thisContext.registerAssets(compiler);
-    //单文件模块与node_modules模块处理
-    thisContext.registerChunks(compilation);
-    // 自定义js打包模板渲染 取消webpackrequire机制，改成纯require
-    thisContext.registerModuleTemplate(compilation)
-    //注册 normal-module-loader
-    thisContext.registerNormalModuleLoader(compilation);
+    try {
+      thisContext.initPageModules();
+      // 自动根据app.js作为入口，分析哪些文件需要单独产出，以及node_modules使用了哪些模块
+      thisContext.registerModuleEntry(compiler)
+      //处理页面相关.json
+      thisContext.registerAssets(compiler);
+      //单文件模块与node_modules模块处理
+      thisContext.registerChunks(compilation);
+      // 自定义js打包模板渲染 取消webpackrequire机制，改成纯require
+      thisContext.registerModuleTemplate(compilation)
+      //注册 normal-module-loader
+      thisContext.registerNormalModuleLoader(compilation);
+    } catch (ex) {
+      console.error(ex.stack);
+    }
   })
 }
 
@@ -173,9 +177,9 @@ WxAppModulePlugin.prototype.resolveModule = function (context, usingPath) {
   const request = usingPath.replace('node_modules/', '');
   module.paths.unshift.apply(module.paths, paths);
   const full = require.resolve(request);
-  const nodeModulesName = full.replace(/\\/g, '/').split('/'+request).shift().split('/').pop();
+  const nodeModulesName = full.replace(/\\/g, '/').split('/' + request).shift().split('/').pop();
   if (nodeModulesName !== 'node_modules') {
-    this.linkNames[usingPath] = '/'+nodeModulesName + '/' + request;
+    this.linkNames[usingPath] = '/' + nodeModulesName + '/' + request;
   }
   module.paths.splice(0, paths.length);
   return full;
