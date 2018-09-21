@@ -75,7 +75,7 @@ WxAppModulePlugin.prototype.apply = function (compiler) {
 WxAppModulePlugin.prototype.initPageModules = function () {
   var config = this.getJson(path.join(this.projectRoot, 'app.json'));
   if (config) {
-    var resourceModules = [path.join(this.projectRoot, 'project.config.json')];
+    var resourceModules = [];
     var pageModules = [];
     var thisContext = this;
     var typedExtensions = this.typedExtensions
