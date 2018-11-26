@@ -12,7 +12,7 @@ function NameResolve(nodeModulesName) {
 NameResolve.prototype.getChunkName = function (name, nodeModulesName) {
   name = name || '';
   if (name.indexOf("node_modules") === 0) {
-    return '/' + (name || '').replace("node_modules", nodeModulesName);
+    return './' + (name || '').replace("node_modules", nodeModulesName);
   } else {
     return (name || '').replace("node_modules", nodeModulesName);
   }

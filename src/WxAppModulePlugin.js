@@ -259,10 +259,10 @@ WxAppModulePlugin.prototype.registerAssets = function (compiler) {
       var cacheKey = cacheKeys.filter(function (key) {
         return cache[key].resource === file;
       })
-      var cacheAsset = cache[cacheKey];
-      if (cacheAsset && !cacheAsset.built) {
-        return;
-      }
+      // var cacheAsset = cache[cacheKey];
+      // if (cacheAsset && !cacheAsset.built) {
+      //   return;
+      // }
       if (usingComponents) {
         const usingKeys = Object.keys(usingComponents);
         usingKeys.forEach(function (using) {
