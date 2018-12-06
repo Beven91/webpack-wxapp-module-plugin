@@ -5,17 +5,17 @@
  *     使微信程序支持webpack打包
  */
 
-var path = require('path')
-var fse = require('fs-extra');
-var Entrypoint = require('webpack/lib/Entrypoint')
-var AMDPlugin = require('webpack/lib/dependencies/AMDPlugin.js')
-var SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
-var MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin');
-var HarmonyDetectionParserPlugin = require("webpack/lib/dependencies/HarmonyDetectionParserPlugin")
-var ConcatSource = require('webpack-sources').ConcatSource
-var NameResolve = require('./dependencies/NameResolve');
+const path = require('path')
+const fse = require('fs-extra');
+const Entrypoint = require('webpack/lib/Entrypoint')
+const AMDPlugin = require('webpack/lib/dependencies/AMDPlugin.js')
+const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
+const MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin');
+const HarmonyDetectionParserPlugin = require("webpack/lib/dependencies/HarmonyDetectionParserPlugin")
+const ConcatSource = require('webpack-sources').ConcatSource
+const NameResolve = require('./dependencies/NameResolve');
 
-var RESOUR_CHUNK_NAME = "@@RESOURCEENTRY@@";
+const RESOUR_CHUNK_NAME = "@@RESOURCEENTRY@@";
 
 //取消AMD模式
 AMDPlugin.prototype.apply = function () {
@@ -39,14 +39,13 @@ function WxAppModulePlugin(nodeModulesName, extensions) {
   this.resourceModules = [];
   this.pageModules = [];
   this.jsonAssets = [];
-  this.linkNames = {};
   this.nodeModulesName = nodeModulesName || "app_node_modules";
   this.Resolve = require('./dependencies/ModuleDependencyTemplateAsResolveName.js');
   this.Template = require('./dependencies/NodeRequireHeaderDependencyTemplate.js')
 }
 
 WxAppModulePlugin.prototype.apply = function (compiler) {
-  var thisContext = this
+  const thisContext = this
   this.options = compiler.options;
   this.projectRoot = this.options.context;
   this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName, projectRoot: this.projectRoot });
@@ -73,24 +72,24 @@ WxAppModulePlugin.prototype.apply = function (compiler) {
  * 初始化小程序引用的页面以及组件与对应的资源文件例如:.json .wxss .wxml,tabBarIcons
  */
 WxAppModulePlugin.prototype.initPageModules = function () {
-  var config = this.getJson(path.join(this.projectRoot, 'app.json'));
+  const config = this.getJson(path.join(this.projectRoot, 'app.json'));
   if (config) {
-    var resourceModules = [];
-    var pageModules = [];
-    var thisContext = this;
-    var typedExtensions = this.typedExtensions
-    var pages = ['app'].concat(this.searchSubPackages(config, config.pages));
+    let resourceModules = [];
+    const pageModules = [];
+    const thisContext = this;
+    const typedExtensions = this.typedExtensions
+    const pages = ['app'].concat(this.searchSubPackages(config, config.pages));
     pages.forEach(function (page) {
-      var modulePath = thisContext.getModuleFullPath(page);
-      var parts = path.parse(modulePath);
-      var namePath = path.join(parts.dir, parts.name);
+      const modulePath = thisContext.getModuleFullPath(page);
+      const parts = path.parse(modulePath);
+      const namePath = path.join(parts.dir, parts.name);
       //附加页面引用的所有组件
       thisContext.pushComponents(pages, modulePath, namePath);
     })
     pages.forEach(function (page) {
-      var modulePath = thisContext.getModuleFullPath(page);
-      var parts = path.parse(modulePath);
-      var namePath = path.join(parts.dir, parts.name);
+      const modulePath = thisContext.getModuleFullPath(page);
+      const parts = path.parse(modulePath);
+      const namePath = path.join(parts.dir, parts.name);
       //搜索当前页面对应的资源文件
       resourceModules = resourceModules.concat(typedExtensions.map(function (ext) { return namePath + ext; }))
       if (page !== 'app') {
@@ -125,10 +124,10 @@ WxAppModulePlugin.prototype.getJson = function (file) {
  */
 WxAppModulePlugin.prototype.searchSubPackages = function (config, pages) {
   pages = pages || [];
-  var subPackages = config.subPackages || [];
+  const subPackages = config.subPackages || [];
   subPackages.forEach(function (package) {
-    var subPages = package.pages || [];
-    var root = package.root;
+    const subPages = package.pages || [];
+    const root = package.root;
     subPages.forEach(function (page) {
       pages.push(root + page);
     })
@@ -144,14 +143,14 @@ WxAppModulePlugin.prototype.searchSubPackages = function (config, pages) {
  * @param {namePath} 页面模块完整路径不带后缀名
  */
 WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePath) {
-  var components = this.requireJson(namePath + '.json').usingComponents || {};
-  var moduleDir = path.dirname(modulePath);
-  for (var name in components) {
-    var usingPath = components[name];
-    var isNodeModules = usingPath.indexOf('node_modules/') === 0;
-    var componentEntry = null;
+  const components = this.requireJson(namePath + '.json').usingComponents || {};
+  const moduleDir = path.dirname(modulePath);
+  for (const name in components) {
+    const usingPath = NameResolve.usingComponentNormalize((components[name] || ''));
+    const isNodeModules = usingPath.indexOf('node_modules/') === 0;
+    let componentEntry = null;
     if (!isNodeModules) {
-      var componentPath = path.join(moduleDir, usingPath);
+      const componentPath = path.join(moduleDir, usingPath);
       componentEntry = path.relative(this.projectRoot, componentPath).toLowerCase();
     } else {
       componentEntry = this.resolveModule(modulePath, usingPath).replace('.js', '');
@@ -159,12 +158,16 @@ WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePa
     if (pages.indexOf(componentEntry) < 0) {
       pages.push(componentEntry);
       const full = this.getModuleFullPath(componentEntry);
-      var parts = path.parse(full);
-      var namePath = path.join(parts.dir, parts.name);
+      const parts = path.parse(full);
+      const namePath = path.join(parts.dir, parts.name);
       this.pushComponents(pages, full, namePath)
     }
   }
 }
+
+/**
+ * 判断当前模块是否能获取到
+ */
 
 WxAppModulePlugin.prototype.resolveModule = function (context, usingPath) {
   const segments = context.split(path.sep);
@@ -177,10 +180,6 @@ WxAppModulePlugin.prototype.resolveModule = function (context, usingPath) {
   const request = usingPath.replace('node_modules/', '');
   module.paths.unshift.apply(module.paths, paths);
   const full = require.resolve(request);
-  const nodeModulesName = full.replace(/\\/g, '/').split('/' + request).shift().split('/').pop();
-  if (nodeModulesName !== 'node_modules') {
-    this.linkNames[usingPath] = '/' + nodeModulesName + '/' + request;
-  }
   module.paths.splice(0, paths.length);
   return full;
 }
@@ -191,9 +190,9 @@ WxAppModulePlugin.prototype.resolveModule = function (context, usingPath) {
  * @param {Array} resourceModules 小程序非js资源 例如 .wxss .wxml .json jpg...
  */
 WxAppModulePlugin.prototype.pushTabBarIcons = function (config, resourceModules) {
-  var tabBar = config.tabBar || {};
-  var tabBarList = tabBar.list || [];
-  var projectRoot = this.projectRoot;
+  const tabBar = config.tabBar || {};
+  const tabBarList = tabBar.list || [];
+  const projectRoot = this.projectRoot;
   tabBarList.forEach(function (tabBarItem) {
     if (tabBarItem.iconPath) {
       resourceModules.push(path.join(projectRoot, tabBarItem.iconPath))
@@ -208,7 +207,7 @@ WxAppModulePlugin.prototype.pushTabBarIcons = function (config, resourceModules)
  * 添加微信小程序app.json配置的所有入口页面
  */
 WxAppModulePlugin.prototype.registerModuleEntry = function (compiler) {
-  var thisContext = this;
+  const thisContext = this;
   this.pageModules.forEach(function (page) {
     //添加页面js
     thisContext.addSingleEntry(compiler, thisContext.getModuleFullPath(page), page);
@@ -222,15 +221,14 @@ WxAppModulePlugin.prototype.registerModuleEntry = function (compiler) {
  * 目标：实现打包服务端代码，entry不再合并成一个文件，而是保留原始目录结构到目标目录
  */
 WxAppModulePlugin.prototype.registerChunks = function (compilation) {
-  var thisContext = this
+  const thisContext = this
   compilation.plugin('optimize-chunks', function (chunks) {
     thisContext.extraChunks = {};
     compilation.chunks = [];
     compilation.entrypoints.clear();
     compilation.namedChunks.clear();
     //compilation.namedChunks = {};
-    var outputOptions = compilation.outputOptions
-    var addChunk = compilation.addChunk.bind(compilation)
+    const addChunk = compilation.addChunk.bind(compilation)
     chunks.filter(function (chunk) {
       return chunk.hasRuntime() && chunk.name
     }).map(function (chunk) {
@@ -247,38 +245,33 @@ WxAppModulePlugin.prototype.registerChunks = function (compilation) {
  * 处理json文件复制
  */
 WxAppModulePlugin.prototype.registerAssets = function (compiler) {
-  var thisContext = this;
+  const thisContext = this;
   compiler.plugin('emit', function (compilation, cb) {
-    var cache = compilation.cache || {};
-    var cacheKeys = Object.keys(cache);
     thisContext.jsonAssets.forEach(function (file) {
-      var outputPath = path.dirname(file);
-      var name = NameResolve.getProjectRelative(thisContext.projectRoot, file);
-      var data = fse.readJsonSync(file);
-      var usingComponents = data.usingComponents;
-      var cacheKey = cacheKeys.filter(function (key) {
-        return cache[key].resource === file;
-      })
-      // var cacheAsset = cache[cacheKey];
-      // if (cacheAsset && !cacheAsset.built) {
-      //   return;
-      // }
+      let name = NameResolve.getProjectRelative(thisContext.projectRoot, file);
+      const data = fse.readJsonSync(file);
+      const usingComponents = data.usingComponents;
       if (usingComponents) {
         const usingKeys = Object.keys(usingComponents);
+        const contextPath = path.dirname(file);
         usingKeys.forEach(function (using) {
-          const usingPath = usingComponents[using];
-          const linkName = thisContext.linkNames[usingPath];
-          usingComponents[using] = linkName ? linkName : NameResolve.getChunkName(usingPath, thisContext.nodeModulesName)
+          const componentPath = usingComponents[using];
+          if (NameResolve.isNodeModuleUsing(componentPath)) {
+            const fullUsingPath = thisContext.resolveModule(contextPath, componentPath);
+            const relativePath = NameResolve.getTargetRelative(thisContext.projectRoot, contextPath, fullUsingPath);
+            usingComponents[using] = NameResolve.getChunkName(relativePath.replace('.js',''), thisContext.nodeModulesName)
+          }
         })
       }
-      var content = JSON.stringify(data, null, 4);
-      var size = content.length;
+      const content = JSON.stringify(data, null, 4);
+      const size = content.length;
       name = NameResolve.getChunkName(name, thisContext.nodeModulesName)
       compilation.assets[name] = {
         size: function () {
           return size;
         },
         source: function () {
+          console.log(name);
           return content;
         }
       };
@@ -315,10 +308,10 @@ WxAppModulePlugin.prototype.renderAssets = function (compilation) {
  * 处理文件输出
  */
 WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, compilation) {
-  var info = path.parse(NameResolve.getProjectRelative(this.projectRoot, mod.userRequest));
-  var name = path.join(info.dir, info.name);
-  var nameWith = name + info.ext;
-  var newChunk = this.extraChunks[nameWith]
+  const info = path.parse(NameResolve.getProjectRelative(this.projectRoot, mod.userRequest));
+  let name = path.join(info.dir, info.name);
+  const nameWith = name + info.ext;
+  let newChunk = this.extraChunks[nameWith]
   if (chunk.name === RESOUR_CHUNK_NAME) {
     return;
   }
@@ -328,7 +321,7 @@ WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, com
   name = name + info.ext;
   if (!newChunk) {
     mod.variables = [];
-    var entrypoint = new Entrypoint(name)
+    const entrypoint = new Entrypoint(name)
     newChunk = this.extraChunks[nameWith] = addChunk(name)
     entrypoint.chunks.push(newChunk)
     newChunk.addGroup(entrypoint);
@@ -347,16 +340,12 @@ WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, com
  * 改成打包目标文件保留原生nodejs风格
  */
 WxAppModulePlugin.prototype.registerModuleTemplate = function (compilation) {
-  var cdnName = this.cdnName;
-  var outputOptions = compilation.outputOptions;
-  var publicPath = outputOptions.publicPath;
-  var replacement = this.replacement.bind(this);
+  const replacement = this.replacement.bind(this);
   compilation.mainTemplate.plugin('render', function (bootstrapSource, chunk, hash, moduleTemplate, dependencyTemplates) {
-    var source = new ConcatSource()
+    const source = new ConcatSource()
     chunk.modulesIterable.forEach(function (module) {
-      var ext = path.extname(module.userRequest)
-      var assets = Object.keys(module.assets || {});
-      var moduleSource = null
+      const ext = path.extname(module.userRequest)
+      let moduleSource = null
       switch (ext) {
         case '.json':
           moduleSource = module._source
@@ -377,7 +366,7 @@ WxAppModulePlugin.prototype.registerModuleTemplate = function (compilation) {
  */
 WxAppModulePlugin.prototype.registerNormalModuleLoader = function (compilation) {
   compilation.plugin("normal-module-loader", function (loaderContext, module) {
-    var exec = loaderContext.exec.bind(loaderContext)
+    const exec = loaderContext.exec.bind(loaderContext)
     loaderContext.exec = function (code, filename) {
       return exec(code, filename.split('!').pop());
     }
@@ -388,10 +377,10 @@ WxAppModulePlugin.prototype.registerNormalModuleLoader = function (compilation) 
  * 替换 __webpack_require
  */
 WxAppModulePlugin.prototype.replacement = function (moduleSource) {
-  var replacements = moduleSource.replacements || [];
+  const replacements = moduleSource.replacements || [];
   replacements.forEach(function (rep) {
-    var v = rep[2] || "";
-    var isVar = v.indexOf("WEBPACK VAR INJECTION") > -1;
+    let v = rep[2] || "";
+    const isVar = v.indexOf("WEBPACK VAR INJECTION") > -1;
     v = isVar ? "" : v.replace(/__webpack_require__/g, 'require');
     if (v.indexOf("AMD") > -1) {
       v = "";
@@ -407,7 +396,7 @@ WxAppModulePlugin.prototype.replacement = function (moduleSource) {
  * @param {*} name  entry名称
  */
 WxAppModulePlugin.prototype.addSingleEntry = function (compiler, entry, name) {
-  var base = this.projectRoot;
+  const base = this.projectRoot;
   compiler.plugin('make', function (compilation, callback) {
     const dep = SingleEntryPlugin.createDependency(entry, name);
     compilation.addEntry(base, dep, name, callback);
