@@ -7,6 +7,7 @@
 
 const path = require('path')
 const fse = require('fs-extra');
+const webpack = require('webpack');
 const Entrypoint = require('webpack/lib/Entrypoint')
 const AMDPlugin = require('webpack/lib/dependencies/AMDPlugin.js')
 const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
@@ -49,6 +50,10 @@ WxAppModulePlugin.prototype.apply = function (compiler) {
   this.options = compiler.options;
   this.projectRoot = this.options.context;
   this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName, projectRoot: this.projectRoot });
+  const definePlugin = new webpack.DefinePlugin({
+    '__webpack_public_path__': JSON.stringify("/"),
+  })
+  definePlugin.apply(compiler);
   compiler.plugin('this-compilation', function (compilation) {
     try {
       thisContext.initPageModules();
@@ -316,7 +321,7 @@ WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, com
   if (nameWith.indexOf("node_modules") > -1) {
     name = NameResolve.getChunkName(name, this.nodeModulesName)
   }
-  name = name + info.ext;
+  name = name + (info.ext === '.js' ? '.js' : info.ext + '.js')
   if (!newChunk) {
     mod.variables = [];
     const entrypoint = new Entrypoint(name)
