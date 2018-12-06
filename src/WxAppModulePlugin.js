@@ -168,7 +168,6 @@ WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePa
 /**
  * 判断当前模块是否能获取到
  */
-
 WxAppModulePlugin.prototype.resolveModule = function (context, usingPath) {
   const segments = context.split(path.sep);
   const paths = [];
@@ -259,7 +258,7 @@ WxAppModulePlugin.prototype.registerAssets = function (compiler) {
           if (NameResolve.isNodeModuleUsing(componentPath)) {
             const fullUsingPath = thisContext.resolveModule(contextPath, componentPath);
             const relativePath = NameResolve.getTargetRelative(thisContext.projectRoot, contextPath, fullUsingPath);
-            usingComponents[using] = NameResolve.getChunkName(relativePath.replace('.js',''), thisContext.nodeModulesName)
+            usingComponents[using] = NameResolve.getChunkName(relativePath.replace('.js', ''), thisContext.nodeModulesName)
           }
         })
       }
@@ -271,7 +270,6 @@ WxAppModulePlugin.prototype.registerAssets = function (compiler) {
           return size;
         },
         source: function () {
-          console.log(name);
           return content;
         }
       };

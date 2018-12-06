@@ -37,7 +37,7 @@ NameResolve.prototype.getProjectRelative = function (projectRoot, source) {
 NameResolve.prototype.getTargetRelative = function (projectRoot, modulePath, modulePath2) {
   const targetPath1 = path.join(projectRoot, this.getProjectRelative(projectRoot, modulePath));
   const targetPath2 = path.join(projectRoot, this.getProjectRelative(projectRoot, modulePath2));
-  return path.relative(targetPath1, targetPath2);
+  return path.relative(targetPath1, targetPath2).replace(/\\/g, '/');
 }
 
 /**
@@ -54,6 +54,9 @@ NameResolve.prototype.moveToProjectRoot = function (projectRoot, source) {
  */
 NameResolve.prototype.usingComponentNormalize = function (usingPath) {
   usingPath = (usingPath || '').trim();
+  if (usingPath.indexOf('node_modules/') === 0) {
+    return usingPath;
+  }
   const isNodeModules = this.isNodeModuleUsing(usingPath);
   return isNodeModules ? 'node_modules/' + usingPath : usingPath;
 }
