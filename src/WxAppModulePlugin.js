@@ -156,7 +156,7 @@ WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePa
     let componentEntry = null;
     if (!isNodeModules) {
       const componentPath = path.join(moduleDir, usingPath);
-      componentEntry = path.relative(this.projectRoot, componentPath).toLowerCase();
+      componentEntry = path.relative(this.projectRoot, componentPath);
     } else {
       componentEntry = this.resolveModule(modulePath, usingPath).replace('.js', '');
     }
