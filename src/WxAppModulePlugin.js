@@ -282,6 +282,8 @@ WxAppModulePlugin.prototype.registerAssets = function (compiler) {
         };
       })
     } catch (ex) {
+      // 出错时，清空输出
+      compilation.assets = {};
       console.error(ex)
     }
     thisContext.renderAssets(compilation);
