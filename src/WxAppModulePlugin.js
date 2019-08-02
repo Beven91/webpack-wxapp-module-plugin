@@ -14,6 +14,7 @@ const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
 const MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin');
 const HarmonyDetectionParserPlugin = require("webpack/lib/dependencies/HarmonyDetectionParserPlugin")
 const ConcatSource = require('webpack-sources').ConcatSource
+
 const NameResolve = require('./dependencies/NameResolve');
 
 const RESOUR_CHUNK_NAME = "@@RESOURCEENTRY@@";
@@ -251,34 +252,38 @@ WxAppModulePlugin.prototype.registerChunks = function (compilation) {
 WxAppModulePlugin.prototype.registerAssets = function (compiler) {
   const thisContext = this;
   compiler.plugin('emit', function (compilation, cb) {
-    thisContext.jsonAssets.forEach(function (file) {
-      let name = NameResolve.getProjectRelative(thisContext.projectRoot, file);
-      const data = fse.readJsonSync(file);
-      const usingComponents = data.usingComponents;
-      if (usingComponents) {
-        const usingKeys = Object.keys(usingComponents);
-        const contextPath = path.dirname(file);
-        usingKeys.forEach(function (using) {
-          const componentPath = usingComponents[using];
-          if (NameResolve.isNodeModuleUsing(componentPath)) {
-            const fullUsingPath = thisContext.resolveModule(contextPath, componentPath);
-            const relativePath = NameResolve.getTargetRelative(thisContext.projectRoot, contextPath, fullUsingPath);
-            usingComponents[using] = NameResolve.getChunkName(relativePath.replace('.js', ''), thisContext.nodeModulesName)
-          }
-        })
-      }
-      const content = JSON.stringify(data, null, 4);
-      const size = content.length;
-      name = NameResolve.getChunkName(name, thisContext.nodeModulesName)
-      compilation.assets[name] = {
-        size: function () {
-          return size;
-        },
-        source: function () {
-          return content;
+    try {
+      thisContext.jsonAssets.forEach(function (file) {
+        let name = NameResolve.getProjectRelative(thisContext.projectRoot, file);
+        const data = fse.readJsonSync(file);
+        const usingComponents = data.usingComponents;
+        if (usingComponents) {
+          const usingKeys = Object.keys(usingComponents);
+          const contextPath = path.dirname(file);
+          usingKeys.forEach(function (using) {
+            const componentPath = usingComponents[using];
+            if (NameResolve.isNodeModuleUsing(componentPath)) {
+              const fullUsingPath = thisContext.resolveModule(contextPath, componentPath);
+              const relativePath = NameResolve.getTargetRelative(thisContext.projectRoot, contextPath, fullUsingPath);
+              usingComponents[using] = NameResolve.getChunkName(relativePath.replace('.js', ''), thisContext.nodeModulesName)
+            }
+          })
         }
-      };
-    })
+        const content = JSON.stringify(data, null, 4);
+        const size = content.length;
+        name = NameResolve.getChunkName(name, thisContext.nodeModulesName)
+        compilation.assets[name] = {
+          size: function () {
+            return size;
+          },
+          source: function () {
+            return content;
+          }
+        };
+      })
+    } catch (ex) {
+      console.error(ex)
+    }
     thisContext.renderAssets(compilation);
     cb();
   });
