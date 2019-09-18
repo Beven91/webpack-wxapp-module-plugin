@@ -4,6 +4,8 @@ function NameResolve(nodeModulesName) {
 
 }
 
+NameResolve.nodeModulesName = 'app_node_modules';
+
 /**
  * 返回输出的chunk名称，这里会渲染node_modules 到指定的名字
  * @param {*} name 

@@ -41,7 +41,8 @@ function WxAppModulePlugin(nodeModulesName, extensions) {
   this.resourceModules = [];
   this.pageModules = [];
   this.jsonAssets = [];
-  this.nodeModulesName = nodeModulesName || "app_node_modules";
+  NameResolve.nodeModulesName = nodeModulesName || NameResolve.nodeModulesName || 'app_node_modules';
+  this.nodeModulesName = NameResolve.nodeModulesName;
   this.Resolve = require('./dependencies/ModuleDependencyTemplateAsResolveName.js');
   this.Template = require('./dependencies/NodeRequireHeaderDependencyTemplate.js')
 }
