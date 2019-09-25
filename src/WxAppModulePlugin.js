@@ -154,20 +154,22 @@ WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePa
   const moduleDir = path.dirname(modulePath);
   for (const name in components) {
     const usingPath = NameResolve.usingComponentNormalize((components[name] || ''));
-    const isNodeModules = usingPath.indexOf('node_modules/') === 0;
-    let componentEntry = null;
-    if (!isNodeModules) {
-      const componentPath = path.join(moduleDir, usingPath);
-      componentEntry = path.relative(this.projectRoot, componentPath);
-    } else {
-      componentEntry = this.resolveModule(modulePath, usingPath).replace('.js', '');
-    }
-    if (pages.indexOf(componentEntry) < 0) {
-      pages.push(componentEntry);
-      const full = this.getModuleFullPath(componentEntry);
-      const parts = path.parse(full);
-      const namePath = path.join(parts.dir, parts.name);
-      this.pushComponents(pages, full, namePath)
+    if (!/plugin:/.test(usingPath)) {
+      const isNodeModules = usingPath.indexOf('node_modules/') === 0;
+      let componentEntry = null;
+      if (!isNodeModules) {
+        const componentPath = path.join(moduleDir, usingPath);
+        componentEntry = path.relative(this.projectRoot, componentPath);
+      } else {
+        componentEntry = this.resolveModule(modulePath, usingPath).replace('.js', '');
+      }
+      if (pages.indexOf(componentEntry) < 0) {
+        pages.push(componentEntry);
+        const full = this.getModuleFullPath(componentEntry);
+        const parts = path.parse(full);
+        const namePath = path.join(parts.dir, parts.name);
+        this.pushComponents(pages, full, namePath)
+      }
     }
   }
 }
@@ -263,6 +265,9 @@ WxAppModulePlugin.prototype.registerAssets = function (compiler) {
           const contextPath = path.dirname(file);
           usingKeys.forEach(function (using) {
             const componentPath = usingComponents[using];
+            if (/plugin:/.test(componentPath)) {
+              return;
+            }
             if (NameResolve.isNodeModuleUsing(componentPath)) {
               const fullUsingPath = thisContext.resolveModule(contextPath, componentPath);
               const relativePath = NameResolve.getTargetRelative(thisContext.projectRoot, contextPath, fullUsingPath);
