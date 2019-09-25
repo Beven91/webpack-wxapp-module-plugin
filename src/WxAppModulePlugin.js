@@ -273,6 +273,7 @@ WxAppModulePlugin.prototype.registerAssets = function (compiler) {
         if (isPage && name !== 'app.json') {
           usingComponents = thisContext.applyGlobalComponents(usingComponents);
         }
+        data.usingComponents = usingComponents;
         if (usingComponents) {
           const usingKeys = Object.keys(usingComponents);
           const contextPath = path.dirname(file);
