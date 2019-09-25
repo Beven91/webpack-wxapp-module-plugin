@@ -33,16 +33,20 @@ HarmonyDetectionParserPlugin.prototype.apply = function () {
  * @param {Array} extensions 扩展名列表，用于插件查找那些后缀的页面资源需要打包
  *               例如默认会附加以下资源: page.wxml page.json page.wxss 
  *               如果需要附加其他页面资源 例如 page.scss 那么可以配置['.scss']
+ * @parma {Object} 全局配置
  */
-function WxAppModulePlugin(nodeModulesName, extensions) {
+function WxAppModulePlugin(nodeModulesName, extensions, options) {
+  options = options || [];
   this.extraChunks = {}
   this.extraPackage = {};
   this.typedExtensions = ['.wxml', '.wxss', '.json'].concat(extensions || []);
   this.resourceModules = [];
   this.pageModules = [];
   this.jsonAssets = [];
+  this.globalComponents = options.globalComponents || {};
   NameResolve.nodeModulesName = nodeModulesName || NameResolve.nodeModulesName || 'app_node_modules';
   this.nodeModulesName = NameResolve.nodeModulesName;
+  this.registryPages = [];
   this.Resolve = require('./dependencies/ModuleDependencyTemplateAsResolveName.js');
   this.Template = require('./dependencies/NodeRequireHeaderDependencyTemplate.js')
 }
@@ -91,7 +95,8 @@ WxAppModulePlugin.prototype.initPageModules = function () {
       const parts = path.parse(modulePath);
       const namePath = path.join(parts.dir, parts.name);
       //附加页面引用的所有组件
-      thisContext.pushComponents(pages, modulePath, namePath);
+      thisContext.pushComponents(pages, modulePath, namePath, true);
+      thisContext.registryPages.push(page);
     })
     pages.forEach(function (page) {
       const modulePath = thisContext.getModuleFullPath(page);
@@ -149,9 +154,13 @@ WxAppModulePlugin.prototype.searchSubPackages = function (config, pages) {
  * @param {modulePath} 页面完整路径
  * @param {namePath} 页面模块完整路径不带后缀名
  */
-WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePath) {
-  const components = this.requireJson(namePath + '.json').usingComponents || {};
+WxAppModulePlugin.prototype.pushComponents = function (pages, modulePath, namePath, isPage) {
+  let components = this.requireJson(namePath + '.json').usingComponents || {};
   const moduleDir = path.dirname(modulePath);
+  if (isPage) {
+    // 如果当前为页面，则进行全局组件附加
+    components = this.applyGlobalComponents(components);
+  }
   for (const name in components) {
     const usingPath = NameResolve.usingComponentNormalize((components[name] || ''));
     if (!/plugin:/.test(usingPath)) {
@@ -259,7 +268,11 @@ WxAppModulePlugin.prototype.registerAssets = function (compiler) {
       thisContext.jsonAssets.forEach(function (file) {
         let name = NameResolve.getProjectRelative(thisContext.projectRoot, file);
         const data = fse.readJsonSync(file);
-        const usingComponents = data.usingComponents;
+        let usingComponents = data.usingComponents || {};
+        const isPage = thisContext.registryPages.indexOf(name.replace('.json', '')) > -1;
+        if (isPage && name !== 'app.json') {
+          usingComponents = thisContext.applyGlobalComponents(usingComponents);
+        }
         if (usingComponents) {
           const usingKeys = Object.keys(usingComponents);
           const contextPath = path.dirname(file);
@@ -433,5 +446,18 @@ WxAppModulePlugin.prototype.requireJson = function (file) {
   return fse.existsSync(file) ? fse.readJSONSync(file) : {};
 }
 
+/**
+ * 附加globalComponents
+ */
+WxAppModulePlugin.prototype.applyGlobalComponents = function (usingComponents) {
+  usingComponents = usingComponents || {};
+  const globalComponents = this.globalComponents || {};
+  Object.keys(globalComponents).forEach(function (key) {
+    if (!usingComponents[key]) {
+      usingComponents[key] = globalComponents[key];
+    }
+  });
+  return usingComponents;
+}
 
 module.exports = WxAppModulePlugin;
