@@ -17,8 +17,6 @@ const ConcatSource = require('webpack-sources').ConcatSource
 
 const NameResolve = require('./dependencies/NameResolve');
 
-const RESOUR_CHUNK_NAME = "@@RESOURCEENTRY@@";
-
 //取消AMD模式
 AMDPlugin.prototype.apply = function () {
 
@@ -41,6 +39,7 @@ function WxAppModulePlugin(nodeModulesName, extensions, options) {
   this.extraPackage = {};
   this.typedExtensions = ['.wxml', '.wxss', '.json'].concat(extensions || []);
   this.resourceModules = [];
+  this.resourceModulesMap = {};
   this.pageModules = [];
   this.jsonAssets = [];
   this.globalComponents = options.globalComponents || {};
@@ -229,8 +228,12 @@ WxAppModulePlugin.prototype.registerModuleEntry = function (compiler) {
     //添加页面js
     thisContext.addSingleEntry(compiler, thisContext.getModuleFullPath(page), page);
   })
-  //将wxss 以及json以及wxml等文件添加到一个entry中
-  compiler.apply(new MultiEntryPlugin(this.projectRoot, this.resourceModules, RESOUR_CHUNK_NAME))
+  //将wxss 以及json以及wxml等文件添加到entry中
+  this.resourceModulesMap = {};
+  this.resourceModules.forEach((f) => {
+    this.resourceModulesMap[f] = true;
+    compiler.apply(new MultiEntryPlugin(this.projectRoot, [this.getModuleFullPath(f)], f))
+  })
 }
 
 /**
@@ -342,7 +345,7 @@ WxAppModulePlugin.prototype.handleAddChunk = function (addChunk, mod, chunk, com
   let name = path.join(info.dir, info.name);
   const nameWith = name + info.ext;
   let newChunk = this.extraChunks[nameWith]
-  if (chunk.name === RESOUR_CHUNK_NAME) {
+  if (this.resourceModulesMap[chunk.name]) {
     return;
   }
   if (nameWith.indexOf("node_modules") > -1) {
