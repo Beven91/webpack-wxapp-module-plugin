@@ -1,49 +1,21 @@
 {
-  "_from": "webpack-wxapp-module-plugin",
-  "_id": "webpack-wxapp-module-plugin@2.2.0",
-  "_inBundle": false,
-  "_integrity": "sha512-+XE84n1sjczG1KXIBObU3m82hzCQRPmomxOcsdRJ9hZ+zYWHeHRRokOBL/nhXaEbwSCV1TtnZe/ngHWZfJGWQA==",
-  "_location": "/webpack-wxapp-module-plugin",
-  "_phantomChildren": {},
-  "_requested": {
-    "type": "tag",
-    "registry": true,
-    "raw": "webpack-wxapp-module-plugin",
-    "name": "webpack-wxapp-module-plugin",
-    "escapedName": "webpack-wxapp-module-plugin",
-    "rawSpec": "",
-    "saveSpec": null,
-    "fetchSpec": "latest"
-  },
-  "_requiredBy": [
-    "#USER",
-    "/"
-  ],
-  "_resolved": "https://registry.npmjs.org/webpack-wxapp-module-plugin/-/webpack-wxapp-module-plugin-2.2.0.tgz",
-  "_shasum": "3a0162589f6a21f8484a3e4a860f2e31999047f4",
-  "_spec": "webpack-wxapp-module-plugin",
-  "_where": "D:\\Works\\Personal\\Charles",
-  "author": {
-    "name": "Beven"
-  },
-  "bugs": {
-    "url": "https://github.com/Beven91/webpack-wxapp-module-plugin/issues"
-  },
-  "bundleDependencies": false,
-  "dependencies": {
-    "fs-extra": "^5.0.0",
-    "webpack-sources": "^1.1.0"
-  },
-  "deprecated": false,
-  "description": "[![NPM version][npm-image]][npm-url]",
-  "homepage": "https://github.com/Beven91/webpack-wxapp-module-plugin#readme",
-  "license": "MIT",
-  "main": "index.js",
   "name": "webpack-wxapp-module-plugin",
+  "version": "2.2.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Beven91/webpack-wxapp-module-plugin.git"
   },
-  "scripts": {},
-  "version": "2.2.0"
+  "author": "Beven",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Beven91/webpack-wxapp-module-plugin/issues"
+  },
+  "homepage": "https://github.com/Beven91/webpack-wxapp-module-plugin#readme",
+  "dependencies": {
+    "fs-extra": "^5.0.0",
+    "webpack-sources": "^1.1.0"
+  }
 }
