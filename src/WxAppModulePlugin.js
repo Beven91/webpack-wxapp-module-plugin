@@ -34,7 +34,7 @@ HarmonyDetectionParserPlugin.prototype.apply = function () {
  * @parma {Object} 全局配置
  */
 function WxAppModulePlugin(nodeModulesName, extensions, options) {
-  options = options || [];
+  options = options || {};
   this.extraChunks = {}
   this.extraPackage = {};
   this.typedExtensions = ['.wxml', '.wxss', '.json'].concat(extensions || []);
@@ -42,10 +42,12 @@ function WxAppModulePlugin(nodeModulesName, extensions, options) {
   this.resourceModulesMap = {};
   this.pageModules = [];
   this.jsonAssets = [];
+  this.platform = options.platform || '';
   this.globalComponents = options.globalComponents || {};
   NameResolve.nodeModulesName = nodeModulesName || NameResolve.nodeModulesName || 'app_node_modules';
   this.nodeModulesName = NameResolve.nodeModulesName;
   this.registryPages = [];
+  this.platformAlias = {};
   this.Resolve = require('./dependencies/ModuleDependencyTemplateAsResolveName.js');
   this.Template = require('./dependencies/NodeRequireHeaderDependencyTemplate.js')
 }
@@ -83,6 +85,7 @@ WxAppModulePlugin.prototype.apply = function (compiler) {
  */
 WxAppModulePlugin.prototype.initPageModules = function () {
   const config = this.getJson(path.join(this.projectRoot, 'app.json'));
+  this.platformAlias = {};
   if (config) {
     let resourceModules = [];
     const pageModules = [];
@@ -102,9 +105,11 @@ WxAppModulePlugin.prototype.initPageModules = function () {
       const parts = path.parse(modulePath);
       const namePath = path.join(parts.dir, parts.name);
       //搜索当前页面对应的资源文件
-      resourceModules = resourceModules.concat(typedExtensions.map(function (ext) { return namePath + ext; }))
+      resourceModules = resourceModules.concat(typedExtensions.map(function (ext) {
+        return thisContext.resolvePlatform(namePath, ext);
+      }))
       if (page !== 'app') {
-        pageModules.push(page + '.js');
+        pageModules.push(thisContext.resolvePlatform(page, '.js', thisContext.projectRoot));
       }
     })
     //导出app.json配置的图片
@@ -115,6 +120,36 @@ WxAppModulePlugin.prototype.initPageModules = function () {
     //this.resourceModules = resourceModules.filter((file) => path.extname(file) !== '.json');
     this.pageModules = pageModules;
   }
+}
+
+/**
+ * 消除平台后缀
+ */
+WxAppModulePlugin.prototype.cleanPlatformAlias = function (mod, chunk) {
+  const name = this.platformAlias[mod.resource];
+  if (name) {
+    return name;
+  } else {
+    return mod.userRequest;
+  }
+}
+
+/**
+ * 平台文件渲染
+ */
+WxAppModulePlugin.prototype.resolvePlatform = function (namePath, ext, root) {
+  const platformPath = namePath + '.' + this.platform + ext;
+  const platformFile = root ? path.join(root, platformPath) : platformPath;
+  const applyPlatform = this.platform && fse.existsSync(platformFile);
+  if (applyPlatform) {
+    if (path.isAbsolute(namePath)) {
+      namePath = namePath.split(this.projectRoot).slice(1).join('').replace(/\\/g, '/').replace(/^\//, '');
+    }
+    const platAlias = namePath + '.' + this.platform + ext;
+    this.platformAlias[platAlias] = namePath + ext;
+    return platformPath;
+  }
+  return namePath + ext;
 }
 
 /**
@@ -223,18 +258,18 @@ WxAppModulePlugin.prototype.pushTabBarIcons = function (config, resourceModules)
  * 添加微信小程序app.json配置的所有入口页面
  */
 WxAppModulePlugin.prototype.registerModuleEntry = function (compiler) {
-  const thisContext = this;
-  this.pageModules.forEach(function (page) {
+  this.pageModules.forEach((page) => {
     //添加页面js
-    thisContext.addSingleEntry(compiler, thisContext.getModuleFullPath(page), page);
+    this.addSingleEntry(compiler, this.getModuleFullPath(page), page);
   })
   //将wxss 以及json以及wxml等文件添加到entry中
   this.resourceModulesMap = {};
   this.resourceModules.forEach((f) => {
     this.resourceModulesMap[f] = true;
-    compiler.apply(new MultiEntryPlugin(this.projectRoot, [this.getModuleFullPath(f)], f))
+    this.addSingleEntry(compiler, this.getModuleFullPath(f), f);
   })
 }
+
 
 /**
  * 自定义webpack entry 
@@ -321,18 +356,22 @@ WxAppModulePlugin.prototype.renderAssets = function (compilation) {
   const allAssets = compilation.assets;
   const keys = Object.keys(allAssets);
   const nodeModulesName = this.nodeModulesName;
-  keys.forEach(function (name) {
+  keys.forEach((name) => {
+    const asset = allAssets[name];
     if (name.indexOf('node_modules') > -1) {
-      const value = allAssets[name];
       delete allAssets[name];
       name = NameResolve.getChunkName(name, nodeModulesName);
       name = nodeModulesName + name.split(nodeModulesName).slice(1);
-      allAssets[name] = value;
+      allAssets[name] = asset;
     } else if (name.indexOf('_/') > -1) {
-      const value = allAssets[name];
       delete allAssets[name];
       name = name.replace(/_\//g, '');
-      allAssets[name] = value;
+      allAssets[name] = asset;
+    }
+    const alias = this.platformAlias[name];
+    if (alias) {
+      delete allAssets[name];
+      allAssets[alias] = asset;
     }
   })
 }
