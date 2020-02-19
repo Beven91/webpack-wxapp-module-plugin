@@ -242,14 +242,16 @@ WxAppModulePlugin.prototype.resolveModule = function (context, usingPath) {
  */
 WxAppModulePlugin.prototype.pushTabBarIcons = function (config, resourceModules) {
   const tabBar = config.tabBar || {};
-  const tabBarList = tabBar.list || [];
+  const tabBarList = tabBar.list || tabBar.items || [];
   const projectRoot = this.projectRoot;
   tabBarList.forEach(function (tabBarItem) {
-    if (tabBarItem.iconPath) {
-      resourceModules.push(path.join(projectRoot, tabBarItem.iconPath))
+    const icon = tabBarItem.iconPath || tabBarItem.icon;
+    const selectedIconPath = tabBarItem.selectedIconPath || tabBarItem.activeIcon;
+    if (icon) {
+      resourceModules.push(path.join(projectRoot, icon))
     }
-    if (tabBarItem.selectedIconPath) {
-      resourceModules.push(path.join(projectRoot, tabBarItem.selectedIconPath))
+    if (selectedIconPath) {
+      resourceModules.push(path.join(projectRoot, selectedIconPath))
     }
   })
 }
@@ -304,10 +306,11 @@ WxAppModulePlugin.prototype.registerAssets = function (compiler) {
   compiler.plugin('emit', function (compilation, cb) {
     try {
       thisContext.jsonAssets.forEach(function (file) {
-        let name = NameResolve.getProjectRelative(thisContext.projectRoot, file);
+        let name = NameResolve.getProjectRelative(thisContext.projectRoot, file).replace(/\\/g,'/');
         const data = fse.readJsonSync(file);
         let usingComponents = data.usingComponents || {};
-        const isPage = thisContext.registryPages.indexOf(name.replace('.json', '')) > -1;
+        const myName = name.replace('.' + thisContext.platform + '.json', '').replace('.json', '')
+        const isPage = thisContext.registryPages.indexOf(myName) > -1;
         if (isPage && name !== 'app.json') {
           usingComponents = thisContext.applyGlobalComponents(usingComponents);
         }
