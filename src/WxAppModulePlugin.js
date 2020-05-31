@@ -4,7 +4,7 @@
  * 描述：
  *     使微信程序支持webpack打包
  */
-
+const vm = require('vm');
 const path = require('path');
 const fse = require('fs-extra');
 const webpack = require('webpack');
@@ -42,6 +42,7 @@ class WxAppModulePlugin {
     this.extraChunks = {};
     this.extraPackage = {};
     this.packages = [];
+    this.packagesMap = {};
     this.registryPages = [];
     this.resourceModulesMap = {};
     this.mainReferences = {};
@@ -69,6 +70,8 @@ class WxAppModulePlugin {
         this.registerModuleEntry(compiler);
         // 处理页面相关.json
         this.registerAssets(compilation);
+        // loaderContext
+        this.registerLoaderContext(compilation);
         // 单文件模块与node_modules模块处理
         this.registerChunks(compilation);
         // 自定义js打包模板渲染 取消webpackrequire机制，改成纯require
@@ -88,6 +91,7 @@ class WxAppModulePlugin {
   initPackages() {
     const config = this.getJson(path.join(this.projectRoot, 'app.json'));
     if (config) {
+      this.packagesMap = {};
       this.jsonAssets = {};
       // 主包
       const main = this.createPackage('', ['app'].concat(config.pages), 'main');
@@ -106,6 +110,9 @@ class WxAppModulePlugin {
       this.pushTabBarIcons(config, main.resources);
       // 将包信息添加到this上
       this.packages = packages;
+      packages.forEach((pack) => {
+        this.packagesMap[pack.name] = pack;
+      })
     }
   }
 
@@ -271,6 +278,35 @@ class WxAppModulePlugin {
   }
 
   /**
+   * 注册loaderContext
+   * @param {*} compilation 
+   */
+  registerLoaderContext(compilation) {
+    compilation.hooks.normalModuleLoader.tap('WxAppModulePlugin', (loaderContext) => {
+      let innerLoadModule = null;
+      const loadModule = (request, callback) => {
+        innerLoadModule.call(loaderContext, request, (err, src) => {
+          if (err) {
+            return callback(err);
+          } else if (!/module.exports(\s+|)=(\s+|)__webpack_public_path__/.test(src)) {
+            return callback(err, src);
+          } else {
+            return callback(err, `module.exports =  "${request}"`)
+          }
+        })
+      }
+      Object.defineProperty(loaderContext, 'loadModule', {
+        get() {
+          return loadModule;
+        },
+        set(v) {
+          innerLoadModule = v;
+        }
+      })
+    })
+  }
+
+  /**
    * 自定义webpack entry
    * 目标：实现打包服务端代码，entry不再合并成一个文件，而是保留原始目录结构到目标目录
    */
@@ -281,15 +317,20 @@ class WxAppModulePlugin {
       compilation.chunks = [];
       compilation.entrypoints.clear();
       compilation.namedChunks.clear();
-      const packages = this.packages;
       const addChunk = compilation.addChunk.bind(compilation);
-      this.mainReferences = {};
       // 收集出非子包的模块依赖信息
+      compilation.modules.forEach((mod) => {
+        const s = mod.resource;
+      })
       chunks
-        .filter((chunk) => chunk.hasRuntime() && chunk.name)
         .forEach((chunk) => {
           if (!subPackRegexp.test(chunk.name)) {
-            chunk.modulesIterable.forEach((mod) => this.mainReferences[mod.resource] = true);
+            const name = chunk.name.split('@').shift();
+            const pack = this.packagesMap[name] || {};
+            chunk.modulesIterable.forEach((mod) => {
+              mod.mpPack = pack;
+              this.mainReferences[mod.resource] = true
+            });
           }
         });
       // 开始资源拆包
@@ -297,7 +338,7 @@ class WxAppModulePlugin {
         .filter((chunk) => chunk.hasRuntime() && chunk.name)
         .map((chunk) => {
           const name = chunk.name.split('@').shift();
-          const pack = packages.filter((m) => m.name == name).pop() || {};
+          const pack = this.packagesMap[name] || {};
           chunk.modulesIterable.forEach((mod) => {
             if (mod.userRequest) {
               this.handleAddChunk(addChunk, mod, chunk, pack, this.mainReferences);
@@ -438,12 +479,18 @@ class WxAppModulePlugin {
     for (let i = 0, k = reasons.length; i < k; i++) {
       const reason = reasons[i];
       const reasonModule = reason.module;
+      let pack = null;
       if (reasonModule && reasonModule.mpPack) {
-        return reasonModule.mpPack;
+        pack = reasonModule.mpPack;
+      } else if (reason.loc || reason.dependency) {
+        const chunkName = (reason.loc || reason.dependency.loc).name || '';
+        const name = chunkName.split('@').shift();
+        pack = this.packagesMap[name];
       }
-      const r = this.searchMpPack(reasonModule);
-      if (r) {
-        return r;
+      pack = pack || this.searchMpPack(reasonModule);
+      if (pack) {
+        mod.mpPack = pack;
+        return pack;
       }
     }
   }
@@ -458,8 +505,6 @@ class WxAppModulePlugin {
     const resource = mod.resource;
     let newChunk = this.extraChunks[nameWith];
     if (this.resourceModulesMap[resource]) {
-      mod.mpPack = pack;
-      chunk.mpPack = pack;
       return;
     }
     if (nameWith.indexOf('node_modules') > -1) {
@@ -487,8 +532,6 @@ class WxAppModulePlugin {
     if (newChunk !== chunk) {
       mod.removeChunk(chunk);
     }
-    newChunk.mod = mod;
-    newChunk.mpPack = pack;
   }
 
   /**
@@ -572,6 +615,17 @@ class WxAppModulePlugin {
     });
     return usingComponents;
   }
+
+  exec(src) {
+    const script = new vm.Script(src, { displayErrors: true });
+    const sandbox = {
+      __webpack_public_path__: '',
+      module: {}
+    };
+    script.runInNewContext(sandbox);
+    return sandbox.module.exports.toString();
+  }
+
 }
 
 
