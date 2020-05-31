@@ -101,6 +101,9 @@ class WxAppModulePlugin {
       const packages = [
         main,
       ];
+      main.pages.forEach((f)=>{
+        this.mainReferences[this.getModuleFullPath(f)] = true;
+      })
       // 分包资源处理
       const subPackages = config.subPackages || [];
       subPackages.forEach((pack) => {
@@ -207,7 +210,8 @@ class WxAppModulePlugin {
         const full = this.getModuleFullPath(componentEntry);
         const parts = path.parse(full);
         const namePath = path.join(parts.dir, parts.name);
-        if (pages.indexOf(componentEntry) < 0) {
+        if(this.mainReferences[full+'.js']){
+        }else if (pages.indexOf(componentEntry) < 0) {
           pages.push(componentEntry);
           const myDepdencies = {};
           this.pushComponents(pages, full, namePath, false, myDepdencies);
@@ -293,7 +297,9 @@ class WxAppModulePlugin {
           } else if (!isUrlExportRegexp.test(src)) {
             return callback(err, src);
           } else {
-            return callback(err, `module.exports =  "${request}"`)
+            const  myRequest = this.exec(src).replace(/(^\/|_\/)/g, '');
+            const mod = loaderContext._module;
+            return callback(err, `module.exports =  "/${this.tranformPackUrl(mod,myRequest)}"`)
           }
         })
       }
