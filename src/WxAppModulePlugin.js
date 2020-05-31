@@ -18,6 +18,8 @@ const NameResolve = require('./dependencies/NameResolve');
 
 const subPackRegexp = /subPack:/;
 
+const isUrlExportRegexp = /module.exports(\s+|)=(\s+|)__webpack_public_path__/;
+
 // 取消AMD模式
 AMDPlugin.prototype.apply = function () {
 
@@ -288,7 +290,7 @@ class WxAppModulePlugin {
         innerLoadModule.call(loaderContext, request, (err, src) => {
           if (err) {
             return callback(err);
-          } else if (!/module.exports(\s+|)=(\s+|)__webpack_public_path__/.test(src)) {
+          } else if (!isUrlExportRegexp.test(src)) {
             return callback(err, src);
           } else {
             return callback(err, `module.exports =  "${request}"`)
@@ -319,9 +321,6 @@ class WxAppModulePlugin {
       compilation.namedChunks.clear();
       const addChunk = compilation.addChunk.bind(compilation);
       // 收集出非子包的模块依赖信息
-      compilation.modules.forEach((mod) => {
-        const s = mod.resource;
-      })
       chunks
         .forEach((chunk) => {
           if (!subPackRegexp.test(chunk.name)) {
@@ -439,8 +438,9 @@ class WxAppModulePlugin {
         const basename = path.basename(key);
         const rPath = relative.replace(/\.\.\//g, '').replace(/^node_modules\//, '');
         const request = path.dirname(rPath) + '/' + basename;
-        const target = (pack.root + '/' + nodeModulesName + '/' + request).replace(/\/\//, '/');
+        const target = this.tranformPackUrl(mod, request);
         const name = NameResolve.getChunkName(target, this.nodeModulesName);
+
         assets[name] = assets[key];
         this.pageOrComponents[mod.resource] = name;
         delete assets[key];
@@ -509,9 +509,7 @@ class WxAppModulePlugin {
     }
     if (nameWith.indexOf('node_modules') > -1) {
       // 当前模块资源是否可以移动带子包中
-      const moveable = pack.subpack && !mainReferences[resource];
-      name = NameResolve.getChunkName(name, this.nodeModulesName);
-      name = moveable ? pack.root + name.replace(/^\./g, '') : name;
+      name = this.tranformPackUrl(mod, name);
     }
     name = name + (info.ext === '.js' ? '.js' : info.ext + '.js');
     if (this.pageOrComponents[resource]) {
@@ -540,9 +538,9 @@ class WxAppModulePlugin {
    */
   registerModuleTemplate(compilation) {
     const replacement = this.replacement.bind(this);
-    compilation.mainTemplate.plugin('render', function (bootstrapSource, chunk, hash, moduleTemplate, dependencyTemplates) {
+    compilation.mainTemplate.hooks.render.tap('WxAppModulePlugin', (bootstrapSource, chunk, hash, moduleTemplate, dependencyTemplates) => {
       const source = new ConcatSource();
-      chunk.modulesIterable.forEach(function (module) {
+      chunk.modulesIterable.forEach((module) => {
         const ext = path.extname(module.userRequest);
         let moduleSource = null;
         switch (ext) {
@@ -550,7 +548,17 @@ class WxAppModulePlugin {
             moduleSource = module._source;
             break;
           default:
-            moduleSource = module.source(dependencyTemplates, moduleTemplate.outputOptions, moduleTemplate.requestShortener);
+            {
+              const source = module._source._value;
+              if (isUrlExportRegexp.test(source)) {
+                moduleSource = new ConcatSource();
+                const name = this.exec(source).replace(/(^\/|_\/)/g, '');
+                moduleSource.add(`module.exports = "/${this.tranformPackUrl(module,name).replace(/\.\//g, '')}"`);
+              } else {
+                moduleSource = module.source(dependencyTemplates, moduleTemplate.outputOptions, moduleTemplate.requestShortener);
+              }
+
+            }
             break;
         }
         replacement(moduleSource);
@@ -586,6 +594,20 @@ class WxAppModulePlugin {
       }
       rep[2] = v;
     });
+  }
+
+  /**
+   * 迁移子包路径转换
+   * @param {*} entry 
+   */
+  tranformPackUrl(mod, request) {
+    const pack = this.searchMpPack(mod) || {};
+    const npmName = this.nodeModulesName;
+    const moveable = pack.subpack && !this.mainReferences[mod.resource];
+    request = NameResolve.getChunkName(request, npmName);
+    const middle = request.indexOf(npmName + '/') > -1 ? '' : npmName;
+    request = moveable ? (pack.root + '/' + middle + '/' + request).replace(/\/\//g, '/') : request;
+    return request.replace(/\/\//g, '/');
   }
 
   /**
