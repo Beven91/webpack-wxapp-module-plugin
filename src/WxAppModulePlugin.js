@@ -19,11 +19,11 @@ const NameResolve = require('./dependencies/NameResolve');
 const subPackRegexp = /subPack:/;
 
 // 取消AMD模式
-AMDPlugin.prototype.apply = function() {
+AMDPlugin.prototype.apply = function () {
 
 };
 
-HarmonyDetectionParserPlugin.prototype.apply = function() {
+HarmonyDetectionParserPlugin.prototype.apply = function () {
 
 };
 
@@ -184,7 +184,7 @@ class WxAppModulePlugin {
       components = this.applyGlobalComponents(components);
     }
     const componentKeys = Object.keys(components);
-    componentKeys.forEach((name)=>{
+    componentKeys.forEach((name) => {
       const usingPath = NameResolve.usingComponentNormalize((components[name] || ''));
       if (!/plugin:/.test(usingPath)) {
         const isNodeModules = usingPath.indexOf('node_modules/') === 0;
@@ -236,7 +236,7 @@ class WxAppModulePlugin {
     const tabBar = config.tabBar || {};
     const tabBarList = tabBar.list || [];
     const projectRoot = this.projectRoot;
-    tabBarList.forEach(function(tabBarItem) {
+    tabBarList.forEach(function (tabBarItem) {
       if (tabBarItem.iconPath) {
         resourceModules.push(path.join(projectRoot, tabBarItem.iconPath));
       }
@@ -257,8 +257,10 @@ class WxAppModulePlugin {
       const resources = pack.resources.filter((f) => !/\.json$/.test(f)).map((f) => this.getModuleFullPath(f));
       const files = pages.concat(resources);
       // 将js,.wxss,wxml等资源添加到打包依赖中
-      files.forEach((file)=>{
-        (new SingleEntryPlugin(this.projectRoot, file, file)).apply(compiler);
+      files.forEach((file) => {
+        const name = file.split(this.projectRoot).pop();
+        const chunkName = pack.name + '@' + name;
+        (new SingleEntryPlugin(this.projectRoot, file, chunkName)).apply(compiler);
       });
       // (new MultiEntryPlugin(this.projectRoot, files, pack.name)).apply(compiler);
       // 添加资源文件清单
@@ -294,7 +296,8 @@ class WxAppModulePlugin {
       chunks
         .filter((chunk) => chunk.hasRuntime() && chunk.name)
         .map((chunk) => {
-          const pack = packages.filter((m) => m.name == chunk.name).pop() || {};
+          const name = chunk.name.split('@').shift();
+          const pack = packages.filter((m) => m.name == name).pop() || {};
           chunk.modulesIterable.forEach((mod) => {
             if (mod.userRequest) {
               this.handleAddChunk(addChunk, mod, chunk, pack, this.mainReferences);
@@ -398,17 +401,20 @@ class WxAppModulePlugin {
         const target = (pack.root + '/' + nodeModulesName + '/' + request).replace(/\/\//, '/');
         const name = NameResolve.getChunkName(target, this.nodeModulesName);
         assets[name] = assets[key];
+        this.pageOrComponents[mod.resource] = name;
         delete assets[key];
         return name;
       } else if (key.indexOf('node_modules') > -1) {
         let name = NameResolve.getChunkName(key, nodeModulesName);
         name = nodeModulesName + name.split(nodeModulesName).slice(1);
         assets[name] = assets[key];
+        this.pageOrComponents[mod.resource] = name;
         delete assets[key];
         return name;
       } else if (key.indexOf('_/') > -1) {
         const name = key.replace(/_\//g, '');
         assets[name] = assets[key];
+        this.pageOrComponents[mod.resource] = name;
         delete assets[key];
         return name;
       } else {
@@ -491,9 +497,9 @@ class WxAppModulePlugin {
    */
   registerModuleTemplate(compilation) {
     const replacement = this.replacement.bind(this);
-    compilation.mainTemplate.plugin('render', function(bootstrapSource, chunk, hash, moduleTemplate, dependencyTemplates) {
+    compilation.mainTemplate.plugin('render', function (bootstrapSource, chunk, hash, moduleTemplate, dependencyTemplates) {
       const source = new ConcatSource();
-      chunk.modulesIterable.forEach(function(module) {
+      chunk.modulesIterable.forEach(function (module) {
         const ext = path.extname(module.userRequest);
         let moduleSource = null;
         switch (ext) {
@@ -515,9 +521,9 @@ class WxAppModulePlugin {
    * 注册normal module loader
    */
   registerNormalModuleLoader(compilation) {
-    compilation.plugin('normal-module-loader', function(loaderContext, module) {
+    compilation.plugin('normal-module-loader', function (loaderContext, module) {
       const exec = loaderContext.exec.bind(loaderContext);
-      loaderContext.exec = function(code, filename) {
+      loaderContext.exec = function (code, filename) {
         return exec(code, filename.split('!').pop());
       };
     });
@@ -528,7 +534,7 @@ class WxAppModulePlugin {
    */
   replacement(moduleSource) {
     const replacements = moduleSource.replacements || [];
-    replacements.forEach(function(rep) {
+    replacements.forEach(function (rep) {
       let v = rep[2] || '';
       const isVar = v.indexOf('WEBPACK VAR INJECTION') > -1;
       v = isVar ? '' : v.replace(/__webpack_require__/g, 'require');
@@ -559,7 +565,7 @@ class WxAppModulePlugin {
   applyGlobalComponents(usingComponents) {
     usingComponents = usingComponents || {};
     const globalComponents = this.globalComponents || {};
-    Object.keys(globalComponents).forEach(function(key) {
+    Object.keys(globalComponents).forEach(function (key) {
       if (!usingComponents[key]) {
         usingComponents[key] = globalComponents[key];
       }
