@@ -10,8 +10,10 @@ NameResolve.nodeModulesName = 'app_node_modules';
  * 返回输出的chunk名称，这里会渲染node_modules 到指定的名字
  * @param {*} name 
  * @param {*} nodeModulesName 
+ * @param {String} 当前资源所在分包
+ * @param {Map} 主包引用资源
  */
-NameResolve.prototype.getChunkName = function (name, nodeModulesName) {
+NameResolve.prototype.getChunkName = function (name, nodeModulesName,chukName,mainReferences) {
   name = name || '';
   if (name.indexOf("node_modules") === 0) {
     return './' + (name || '').replace(/node_modules/g, nodeModulesName);

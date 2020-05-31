@@ -12,6 +12,8 @@ var NameResolve = require('./NameResolve');
 var Nodes_Module_Name = "";
 var ProjectRoot = null;
 
+var runtimeAlias = {};
+
 /**
  * webpack require 使用模块名称作为模块标识
  * 用于替换 ModuleDependencyTemplateAsId 模板
@@ -28,7 +30,7 @@ ModuleDependencyTemplateAsResolveName.prototype.apply = function (dep, source, o
   var module = dep.module
   var request = dep.userRequest
   var content = request
-  var resource = module.resource;
+  var resource = runtimeAlias[module.resource] || module.resource;
   var sourcePath = source._source._name
   var isRequirejs = (request.indexOf('./') > -1 || request.indexOf('../') > -1) || request.indexOf('image!') == 0;
   var cExtName = path.extname(content);
@@ -81,7 +83,8 @@ ModuleDependencyTemplateAsResolveName.prototype.absoluteResolve = function (cont
  */
 ModuleDependencyTemplateAsResolveName.prototype.relativeResolve = function (sourcePath, resource) {
   sourcePath = sourcePath.split('!').pop();
-  sourcePath = path.dirname(sourcePath)
+  sourcePath = runtimeAlias[sourcePath] || sourcePath;
+  sourcePath =  path.dirname(sourcePath);
   var movedSourcePath = NameResolve.moveToProjectRoot(ProjectRoot, sourcePath);
   var movedSource = NameResolve.moveToProjectRoot(ProjectRoot,resource);
   var content = path.relative(movedSourcePath, movedSource)
@@ -117,4 +120,12 @@ HarmonyImportDependency.Template = ModuleDependencyTemplateAsResolveName;
 module.exports.setOptions = function (options) {
   Nodes_Module_Name = options.nodeModulesName;
   ProjectRoot = options.projectRoot;
+}
+
+module.exports.setAliasModule = function(mod,alias){
+  runtimeAlias[mod.resource] = alias;
+};
+
+module.exports.clearAlias = function(){
+  runtimeAlias = {};
 }
