@@ -611,8 +611,10 @@ class WxAppModulePlugin {
     const npmName = this.nodeModulesName;
     const moveable = pack.subpack && !this.mainReferences[mod.resource];
     request = NameResolve.getChunkName(request, npmName);
-    const middle = request.indexOf(npmName + '/') > -1 ? '' : npmName;
-    request = moveable ? (pack.root + '/' + middle + '/' + request).replace(/\/\//g, '/') : request;
+    if(request.indexOf(pack.root) < 0){
+      const middle = request.indexOf(npmName + '/') > -1 ? '' : npmName;
+      request = moveable ? (pack.root + '/' + middle + '/' + request).replace(/\/\//g, '/') : request;
+    }
     return request.replace(/\/\//g, '/');
   }
 
