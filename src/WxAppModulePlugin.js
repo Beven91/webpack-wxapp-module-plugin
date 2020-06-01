@@ -299,7 +299,7 @@ class WxAppModulePlugin {
           } else {
             const  myRequest = this.exec(src).replace(/(^\/|_\/)/g, '');
             const mod = loaderContext._module;
-            return callback(err, `module.exports =  "/${this.tranformPackUrl(mod,myRequest)}"`)
+            return callback(err, `module.exports =  "/${this.tranformPackUrl(mod,myRequest).replace(/\.\//g, '')}"`)
           }
         })
       }
