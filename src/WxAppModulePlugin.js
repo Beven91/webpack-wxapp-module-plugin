@@ -1,3 +1,4 @@
+
 /**
  * 名称：微信小程序webapck插件
  * 日期:2017-12-19
@@ -21,11 +22,11 @@ const subPackRegexp = /subPack:/;
 const isUrlExportRegexp = /module.exports(\s+|)=(\s+|)__webpack_public_path__/;
 
 // 取消AMD模式
-AMDPlugin.prototype.apply = function () {
+AMDPlugin.prototype.apply = function() {
 
 };
 
-HarmonyDetectionParserPlugin.prototype.apply = function () {
+HarmonyDetectionParserPlugin.prototype.apply = function() {
 
 };
 
@@ -95,15 +96,16 @@ class WxAppModulePlugin {
     if (config) {
       this.packagesMap = {};
       this.jsonAssets = {};
+      this.readyMainReferences = {};
       // 主包
       const main = this.createPackage('', ['app'].concat(config.pages), 'main');
       // 当前小程序所有包
       const packages = [
         main,
       ];
-      main.pages.forEach((f)=>{
+      main.pages.forEach((f) => {
         this.mainReferences[this.getModuleFullPath(f)] = true;
-      })
+      });
       // 分包资源处理
       const subPackages = config.subPackages || [];
       subPackages.forEach((pack) => {
@@ -111,13 +113,44 @@ class WxAppModulePlugin {
         const root = pack.root;
         packages.push(this.createPackage(root, subPages, 'subPack:' + root, true));
       });
+      // 将子包相互共享的组件提升到主包
+      packages.forEach((pack) => {
+        this.packagesMap[pack.name] = pack;
+        if (pack.name === 'main') {
+          return;
+        }
+        // 过滤掉需要提升到主包中的模块
+        pack.pages = pack.pages.filter((k) => {
+          const fullName = this.getModuleFullPath(k);
+          const info = this.readyMainReferences[fullName] || {};
+          const isMain = info.pack === 'main';
+          if (isMain) {
+            const exists = main.pages.find((p) => this.getModuleFullPath(p) === fullName);
+            if (!exists) {
+              // 标记到主包中
+              this.mainReferences[fullName] = true;
+              // 添加到主包中
+              main.pages.push(k);
+            }
+          }
+          return !isMain;
+        });
+      });
+      packages.forEach((pack) => {
+        pack.pages.forEach((page) => {
+          const modulePath = this.getModuleFullPath(page);
+          const parts = path.parse(modulePath);
+          const namePath = path.join(parts.dir, parts.name);
+          // 搜索当前页面对应的资源文件 例如: .wxml .wxss .json
+          pack.resources = pack.resources.concat(this.typedExtensions.map((ext) => namePath + ext));
+        });
+        // 过滤掉不存在的文件
+        pack.resources = pack.resources.filter(fse.existsSync.bind(fse));
+      });
       // 将tab等图标添加到主包资源中去
       this.pushTabBarIcons(config, main.resources);
       // 将包信息添加到this上
       this.packages = packages;
-      packages.forEach((pack) => {
-        this.packagesMap[pack.name] = pack;
-      })
     }
   }
 
@@ -148,17 +181,11 @@ class WxAppModulePlugin {
       this.registryPages.push(page);
     });
     currentPages.forEach((page) => {
-      const modulePath = this.getModuleFullPath(page);
-      const parts = path.parse(modulePath);
-      const namePath = path.join(parts.dir, parts.name);
-      // 搜索当前页面对应的资源文件 例如: .wxml .wxss .json
-      pack.resources = pack.resources.concat(this.typedExtensions.map((ext) => namePath + ext));
       if (page !== 'app') {
-        pack.pages.push(page + '.js');
+        page = /\.js$/.test(page) ? page : page + '.js';
+        pack.pages.push(page);
       }
     });
-    // 过滤掉不存在的文件
-    pack.resources = pack.resources.filter(fse.existsSync.bind(fse));
     // 获取绝对路径
     return pack;
   }
@@ -210,9 +237,16 @@ class WxAppModulePlugin {
         const full = this.getModuleFullPath(componentEntry);
         const parts = path.parse(full);
         const namePath = path.join(parts.dir, parts.name);
-        if(this.mainReferences[full+'.js']){
-        }else if (pages.indexOf(componentEntry) < 0) {
-          pages.push(componentEntry);
+        const fullName = full + '.js';
+        if (this.mainReferences[fullName]) {
+        } else if (pages.indexOf(componentEntry) < 0) {
+          if (this.readyMainReferences[fullName]) {
+            // 如果存在两次引用，则表示是从两个子包依赖了同一个组件，则将组件提升到主包中
+            this.readyMainReferences[fullName] = { name: componentEntry, pack: 'main', namePath: namePath };
+          } else {
+            this.readyMainReferences[fullName] = {};
+          }
+          pages.push(fullName);
           const myDepdencies = {};
           this.pushComponents(pages, full, namePath, false, myDepdencies);
           this.addJsonAsset({ path: namePath, dependencies: myDepdencies });
@@ -249,7 +283,7 @@ class WxAppModulePlugin {
     const tabBar = config.tabBar || {};
     const tabBarList = tabBar.list || [];
     const projectRoot = this.projectRoot;
-    tabBarList.forEach(function (tabBarItem) {
+    tabBarList.forEach(function(tabBarItem) {
       if (tabBarItem.iconPath) {
         resourceModules.push(path.join(projectRoot, tabBarItem.iconPath));
       }
@@ -285,7 +319,7 @@ class WxAppModulePlugin {
 
   /**
    * 注册loaderContext
-   * @param {*} compilation 
+   * @param {*} compilation
    */
   registerLoaderContext(compilation) {
     compilation.hooks.normalModuleLoader.tap('WxAppModulePlugin', (loaderContext) => {
@@ -297,21 +331,21 @@ class WxAppModulePlugin {
           } else if (!isUrlExportRegexp.test(src)) {
             return callback(err, src);
           } else {
-            const  myRequest = this.exec(src).replace(/(^\/|_\/)/g, '');
+            const myRequest = this.exec(src).replace(/(^\/|_\/)/g, '');
             const mod = loaderContext._module;
-            return callback(err, `module.exports =  "/${this.tranformPackUrl(mod,myRequest).replace(/\.\//g, '')}"`)
+            return callback(err, `module.exports =  "/${this.tranformPackUrl(mod, myRequest).replace(/\.\//g, '')}"`);
           }
-        })
-      }
+        });
+      };
       Object.defineProperty(loaderContext, 'loadModule', {
         get() {
           return loadModule;
         },
         set(v) {
           innerLoadModule = v;
-        }
-      })
-    })
+        },
+      });
+    });
   }
 
   /**
@@ -334,7 +368,7 @@ class WxAppModulePlugin {
             const pack = this.packagesMap[name] || {};
             chunk.modulesIterable.forEach((mod) => {
               mod.mpPack = pack;
-              this.mainReferences[mod.resource] = true
+              this.mainReferences[mod.resource] = true;
             });
           }
         });
@@ -559,11 +593,10 @@ class WxAppModulePlugin {
               if (isUrlExportRegexp.test(source)) {
                 moduleSource = new ConcatSource();
                 const name = this.exec(source).replace(/(^\/|_\/)/g, '');
-                moduleSource.add(`module.exports = "/${this.tranformPackUrl(module,name).replace(/\.\//g, '')}"`);
+                moduleSource.add(`module.exports = "/${this.tranformPackUrl(module, name).replace(/\.\//g, '')}"`);
               } else {
                 moduleSource = module.source(dependencyTemplates, moduleTemplate.outputOptions, moduleTemplate.requestShortener);
               }
-
             }
             break;
         }
@@ -578,9 +611,9 @@ class WxAppModulePlugin {
    * 注册normal module loader
    */
   registerNormalModuleLoader(compilation) {
-    compilation.plugin('normal-module-loader', function (loaderContext, module) {
+    compilation.plugin('normal-module-loader', function(loaderContext, module) {
       const exec = loaderContext.exec.bind(loaderContext);
-      loaderContext.exec = function (code, filename) {
+      loaderContext.exec = function(code, filename) {
         return exec(code, filename.split('!').pop());
       };
     });
@@ -591,7 +624,7 @@ class WxAppModulePlugin {
    */
   replacement(moduleSource) {
     const replacements = moduleSource.replacements || [];
-    replacements.forEach(function (rep) {
+    replacements.forEach(function(rep) {
       let v = rep[2] || '';
       const isVar = v.indexOf('WEBPACK VAR INJECTION') > -1;
       v = isVar ? '' : v.replace(/__webpack_require__/g, 'require');
@@ -604,14 +637,14 @@ class WxAppModulePlugin {
 
   /**
    * 迁移子包路径转换
-   * @param {*} entry 
+   * @param {*} entry
    */
   tranformPackUrl(mod, request) {
     const pack = this.searchMpPack(mod) || {};
     const npmName = this.nodeModulesName;
     const moveable = pack.subpack && !this.mainReferences[mod.resource];
     request = NameResolve.getChunkName(request, npmName);
-    if(request.indexOf(pack.root) < 0){
+    if (request.indexOf(pack.root) < 0) {
       const middle = request.indexOf(npmName + '/') > -1 ? '' : npmName;
       request = moveable ? (pack.root + '/' + middle + '/' + request).replace(/\/\//g, '/') : request;
     }
@@ -638,7 +671,7 @@ class WxAppModulePlugin {
   applyGlobalComponents(usingComponents) {
     usingComponents = usingComponents || {};
     const globalComponents = this.globalComponents || {};
-    Object.keys(globalComponents).forEach(function (key) {
+    Object.keys(globalComponents).forEach(function(key) {
       if (!usingComponents[key]) {
         usingComponents[key] = globalComponents[key];
       }
@@ -650,12 +683,11 @@ class WxAppModulePlugin {
     const script = new vm.Script(src, { displayErrors: true });
     const sandbox = {
       __webpack_public_path__: '',
-      module: {}
+      module: {},
     };
     script.runInNewContext(sandbox);
     return sandbox.module.exports.toString();
   }
-
 }
 
 
