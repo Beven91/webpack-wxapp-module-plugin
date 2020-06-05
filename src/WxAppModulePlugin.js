@@ -239,7 +239,7 @@ class WxAppModulePlugin {
         const namePath = path.join(parts.dir, parts.name);
         const fullName = full + '.js';
         if (this.mainReferences[fullName]) {
-        } else if (pages.indexOf(componentEntry) < 0) {
+        } else if (pages.indexOf(fullName) < 0) {
           if (this.readyMainReferences[fullName]) {
             // 如果存在两次引用，则表示是从两个子包依赖了同一个组件，则将组件提升到主包中
             this.readyMainReferences[fullName] = { name: componentEntry, pack: 'main', namePath: namePath };
