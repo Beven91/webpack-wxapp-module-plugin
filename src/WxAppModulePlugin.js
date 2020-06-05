@@ -181,10 +181,8 @@ class WxAppModulePlugin {
       this.registryPages.push(page);
     });
     currentPages.forEach((page) => {
-      if (page !== 'app') {
-        page = /\.js$/.test(page) ? page : page + '.js';
-        pack.pages.push(page);
-      }
+      page = /\.js$/.test(page) ? page : page + '.js';
+      pack.pages.push(page);
     });
     // 获取绝对路径
     return pack;
