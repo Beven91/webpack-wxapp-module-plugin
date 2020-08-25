@@ -22,11 +22,11 @@ const subPackRegexp = /subPack:/;
 const isUrlExportRegexp = /module.exports(\s+|)=(\s+|)__webpack_public_path__/;
 
 // 取消AMD模式
-AMDPlugin.prototype.apply = function() {
+AMDPlugin.prototype.apply = function () {
 
 };
 
-HarmonyDetectionParserPlugin.prototype.apply = function() {
+HarmonyDetectionParserPlugin.prototype.apply = function () {
 
 };
 
@@ -281,7 +281,7 @@ class WxAppModulePlugin {
     const tabBar = config.tabBar || {};
     const tabBarList = tabBar.list || [];
     const projectRoot = this.projectRoot;
-    tabBarList.forEach(function(tabBarItem) {
+    tabBarList.forEach(function (tabBarItem) {
       if (tabBarItem.iconPath) {
         resourceModules.push(path.join(projectRoot, tabBarItem.iconPath));
       }
@@ -398,6 +398,13 @@ class WxAppModulePlugin {
         mod.mpPack = this.searchMpPack(mod);
         // 将当前模块的所有输出，根据包来决定是独立输出到子包目录下，还是主目录下
         this.renderAssets(mod, Object.keys(assets), assets, mainReferences);
+      });
+    });
+    compilation.hooks.chunkAsset.tap('WxAppModulePlugin', (chunk, name) => {
+      const mainReferences = this.mainReferences;
+      chunk.modulesIterable.forEach((mod) => {
+        // 将当前模块的所有输出，根据包来决定是独立输出到子包目录下，还是主目录下
+        chunk.files = this.renderAssets(mod, [name], compilation.assets, mainReferences);
       });
     });
     // 处理块输出
@@ -609,9 +616,9 @@ class WxAppModulePlugin {
    * 注册normal module loader
    */
   registerNormalModuleLoader(compilation) {
-    compilation.plugin('normal-module-loader', function(loaderContext, module) {
+    compilation.plugin('normal-module-loader', function (loaderContext, module) {
       const exec = loaderContext.exec.bind(loaderContext);
-      loaderContext.exec = function(code, filename) {
+      loaderContext.exec = function (code, filename) {
         return exec(code, filename.split('!').pop());
       };
     });
@@ -622,7 +629,7 @@ class WxAppModulePlugin {
    */
   replacement(moduleSource) {
     const replacements = moduleSource.replacements || [];
-    replacements.forEach(function(rep) {
+    replacements.forEach(function (rep) {
       let v = rep[2] || '';
       const isVar = v.indexOf('WEBPACK VAR INJECTION') > -1;
       v = isVar ? '' : v.replace(/__webpack_require__/g, 'require');
@@ -669,7 +676,7 @@ class WxAppModulePlugin {
   applyGlobalComponents(usingComponents) {
     usingComponents = usingComponents || {};
     const globalComponents = this.globalComponents || {};
-    Object.keys(globalComponents).forEach(function(key) {
+    Object.keys(globalComponents).forEach(function (key) {
       if (!usingComponents[key]) {
         usingComponents[key] = globalComponents[key];
       }
