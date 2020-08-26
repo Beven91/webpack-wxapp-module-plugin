@@ -26,7 +26,7 @@ function ModuleDependencyTemplateAsResolveName() {
  */
 ModuleDependencyTemplateAsResolveName.prototype.apply = function (dep, source, outputOptions, requestShortener) {
   if (!dep.range) return;
-  if(!dep.module) return;
+  if (!dep.module) return;
   var module = dep.module
   var request = dep.userRequest
   var content = request
@@ -84,9 +84,9 @@ ModuleDependencyTemplateAsResolveName.prototype.absoluteResolve = function (cont
 ModuleDependencyTemplateAsResolveName.prototype.relativeResolve = function (sourcePath, resource) {
   sourcePath = sourcePath.split('!').pop();
   sourcePath = runtimeAlias[sourcePath] || sourcePath;
-  sourcePath =  path.dirname(sourcePath);
+  sourcePath = path.dirname(sourcePath);
   var movedSourcePath = NameResolve.moveToProjectRoot(ProjectRoot, sourcePath);
-  var movedSource = NameResolve.moveToProjectRoot(ProjectRoot,resource);
+  var movedSource = NameResolve.moveToProjectRoot(ProjectRoot, resource);
   var content = path.relative(movedSourcePath, movedSource)
   var extName = path.extname(resource)
   var info = path.parse(content)
@@ -122,10 +122,10 @@ module.exports.setOptions = function (options) {
   ProjectRoot = options.projectRoot;
 }
 
-module.exports.setAliasModule = function(mod,alias){
+module.exports.setAliasModule = function (mod, alias) {
   runtimeAlias[mod.resource] = alias;
 };
 
-module.exports.clearAlias = function(){
+module.exports.clearAlias = function () {
   runtimeAlias = {};
 }

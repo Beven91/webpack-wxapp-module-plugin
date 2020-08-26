@@ -56,6 +56,7 @@ class WxAppModulePlugin {
     this.Resolve = require('./dependencies/ModuleDependencyTemplateAsResolveName.js');
     this.Template = require('./dependencies/NodeRequireHeaderDependencyTemplate.js');
     NameResolve.nodeModulesName = this.nodeModulesName;
+    NameResolve.pluginInstance = this;
   }
 
   apply(compiler) {
@@ -434,7 +435,11 @@ class WxAppModulePlugin {
       const assetKeys = Object.keys(this.jsonAssets);
       assetKeys.forEach((k) => {
         const item = this.jsonAssets[k];
-        const name = this.pageOrComponents[item.path + '.js'].replace(/\.js$/, '.json');
+        const request = item.path + '.js';
+        if (!this.pageOrComponents[request]) {
+          throw new Error('找不到组件:' + item.path);
+        }
+        const name = this.pageOrComponents[request].replace(/\.js$/, '.json');
         const data = fse.readJsonSync(item.path + '.json');
         let usingComponents = data.usingComponents || {};
         const isPage = this.registryPages.indexOf(name.replace('.json', '')) > -1;
@@ -485,28 +490,29 @@ class WxAppModulePlugin {
         const request = path.dirname(rPath) + '/' + basename;
         const target = this.tranformPackUrl(mod, request);
         const name = NameResolve.getChunkName(target, this.nodeModulesName);
-
-        assets[name] = assets[key];
-        this.pageOrComponents[mod.resource] = name;
-        delete assets[key];
+        this.replaceAsset(name, key, mod, assets);
         return name;
       } else if (key.indexOf('node_modules') > -1) {
         let name = NameResolve.getChunkName(key, nodeModulesName);
         name = nodeModulesName + name.split(nodeModulesName).slice(1);
-        assets[name] = assets[key];
-        this.pageOrComponents[mod.resource] = name;
-        delete assets[key];
+        this.replaceAsset(name, key, mod, assets);
         return name;
       } else if (key.indexOf('_/') > -1) {
         const name = key.replace(/_\//g, '');
-        assets[name] = assets[key];
-        this.pageOrComponents[mod.resource] = name;
-        delete assets[key];
+        this.replaceAsset(name, key, mod, assets);
         return name;
       } else {
         return key;
       }
     });
+  }
+
+  replaceAsset(target, key, mod, assets) {
+    if (target !== key) {
+      assets[target] = assets[key];
+      this.pageOrComponents[mod.resource] = target;
+      delete assets[key];
+    }
   }
 
   /**
@@ -546,15 +552,16 @@ class WxAppModulePlugin {
   handleAddChunk(addChunk, mod, chunk, pack, mainReferences) {
     const info = path.parse(NameResolve.getProjectRelative(this.projectRoot, mod.userRequest));
     let name = path.join(info.dir, info.name);
-    const nameWith = name + info.ext;
+    let nameWith = name + info.ext;
     const resource = mod.resource;
     let newChunk = this.extraChunks[nameWith];
     if (this.resourceModulesMap[resource]) {
       return;
     }
-    if (nameWith.indexOf('node_modules') > -1) {
+    if (nameWith.indexOf('node_modules') > -1 || !mainReferences[resource]) {
       // 当前模块资源是否可以移动带子包中
       name = this.tranformPackUrl(mod, name);
+      nameWith = name + info.ext;
     }
     name = name + (info.ext === '.js' ? '.js' : info.ext + '.js');
     if (this.pageOrComponents[resource]) {

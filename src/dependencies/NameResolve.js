@@ -1,7 +1,7 @@
 var path = require('path');
 
 function NameResolve(nodeModulesName) {
-
+  this.pluginInstance = null;
 }
 
 NameResolve.nodeModulesName = 'app_node_modules';
@@ -13,7 +13,7 @@ NameResolve.nodeModulesName = 'app_node_modules';
  * @param {String} 当前资源所在分包
  * @param {Map} 主包引用资源
  */
-NameResolve.prototype.getChunkName = function (name, nodeModulesName,chukName,mainReferences) {
+NameResolve.prototype.getChunkName = function (name, nodeModulesName, chukName, mainReferences) {
   name = name || '';
   if (name.indexOf("node_modules") === 0) {
     return './' + (name || '').replace(/node_modules/g, nodeModulesName);
@@ -70,6 +70,14 @@ NameResolve.prototype.usingComponentNormalize = function (usingPath) {
  */
 NameResolve.prototype.isNodeModuleUsing = function (componentPath) {
   return !(componentPath.indexOf('../') === 0 || componentPath.indexOf('./') === 0 || componentPath.indexOf('/') === 0)
+}
+
+/**
+ * 迁移子包路径转换
+ * @param {*} entry
+ */
+NameResolve.prototype.tranformPackUrl = function (mod, request) {
+  return this.pluginInstance.tranformPackUrl(mod, request);
 }
 
 module.exports = new NameResolve();
