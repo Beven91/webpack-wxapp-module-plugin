@@ -359,6 +359,7 @@ class WxAppModulePlugin {
       compilation.entrypoints.clear();
       compilation.namedChunks.clear();
       const addChunk = compilation.addChunk.bind(compilation);
+      const preMainReferences = {};
       // 收集出非子包的模块依赖信息
       chunks
         .forEach((chunk) => {
@@ -368,6 +369,15 @@ class WxAppModulePlugin {
             chunk.modulesIterable.forEach((mod) => {
               mod.mpPack = pack;
               this.mainReferences[mod.resource] = true;
+            });
+          }else{
+            chunk.modulesIterable.forEach((mod) => {
+              const ticks = preMainReferences[mod.resource] || 0
+              preMainReferences[mod.resource] = ticks + 1;
+              // 将同时在2个分包即以上下引用的模块需要提升为主包
+              if(ticks > 0){
+                this.mainReferences[mod.resource] = true;
+              }
             });
           }
         });
