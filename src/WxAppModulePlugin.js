@@ -14,6 +14,7 @@ const AMDPlugin = require('webpack/lib/dependencies/AMDPlugin.js');
 const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
 const HarmonyDetectionParserPlugin = require('webpack/lib/dependencies/HarmonyDetectionParserPlugin');
 const ConcatSource = require('webpack-sources').ConcatSource;
+const WebpackVersion = require('./WebpackVersion');
 
 const NameResolve = require('./dependencies/NameResolve');
 
@@ -66,7 +67,13 @@ class WxAppModulePlugin {
     const definePlugin = new webpack.DefinePlugin({
       '__webpack_public_path__': JSON.stringify('/'),
     });
+    // 设置node = false;
+    this.options.node = false;
     definePlugin.apply(compiler);
+    // 重新设置webpack相关依赖，用于修改输出模块引用体系
+    compiler.hooks.make.tap('WxAppModulePlugin', (compilation) => {
+      WebpackVersion.initializeWebpackDependencies(compilation);
+    });
     compiler.hooks.thisCompilation.tap('WxAppModulePlugin', (compilation) => {
       try {
         this.initPackages();
@@ -83,7 +90,13 @@ class WxAppModulePlugin {
         // 注册 normal-module-loader
         this.registerNormalModuleLoader(compilation);
       } catch (ex) {
-        console.error(ex.stack);
+        if (compilation.logger) {
+          compilation.logger.error(ex);
+        } else {
+          throw new Error(ex.stack);
+          // compilation.errors.push(ex);
+        }
+        // console.error(ex.stack);
       }
     });
   }
@@ -237,6 +250,9 @@ class WxAppModulePlugin {
         const parts = path.parse(full);
         const namePath = path.join(parts.dir, parts.name);
         const fullName = full + '.js';
+        if (!fse.existsSync(fullName)) {
+          throw new Error('找不到组件: ' + full + '\n     at ' + modulePath + '.json');
+        }
         if (this.mainReferences[fullName]) {
         } else if (pages.indexOf(fullName) < 0) {
           if (this.readyMainReferences[fullName]) {
@@ -321,7 +337,8 @@ class WxAppModulePlugin {
    * @param {*} compilation
    */
   registerLoaderContext(compilation) {
-    compilation.hooks.normalModuleLoader.tap('WxAppModulePlugin', (loaderContext) => {
+    const normalModuleLoader = WebpackVersion.getNormalModuleLoader(compilation);
+    normalModuleLoader.tap('WxAppModulePlugin', (loaderContext) => {
       let innerLoadModule = null;
       const loadModule = (request, callback) => {
         innerLoadModule.call(loaderContext, request, (err, src) => {
@@ -349,47 +366,47 @@ class WxAppModulePlugin {
 
   /**
    * 自定义webpack entry
-   * 目标：实现打包服务端代码，entry不再合并成一个文件，而是保留原始目录结构到目标目录
+   * 目标：entry不再合并成一个文件，而是保留原始目录结构到目标目录
    */
   registerChunks(compilation) {
     this.Resolve.clearAlias();
     compilation.hooks.optimizeChunks.tap('WxAppModulePlugin', (chunks) => {
       this.extraChunks = {};
-      compilation.chunks = [];
-      compilation.entrypoints.clear();
-      compilation.namedChunks.clear();
-      const addChunk = compilation.addChunk.bind(compilation);
+      const originChunks = WebpackVersion.cloneChunks(chunks);
       const preMainReferences = {};
+      WebpackVersion.clearChunks(compilation);
       // 收集出非子包的模块依赖信息
-      chunks
+      originChunks
         .forEach((chunk) => {
+          const modulesIterable = WebpackVersion.getModulesIterable(compilation, chunk);
           if (!subPackRegexp.test(chunk.name)) {
             const name = chunk.name.split('@').shift();
             const pack = this.packagesMap[name] || {};
-            chunk.modulesIterable.forEach((mod) => {
+            modulesIterable.forEach((mod) => {
               mod.mpPack = pack;
               this.mainReferences[mod.resource] = true;
             });
-          }else{
-            chunk.modulesIterable.forEach((mod) => {
+          } else {
+            modulesIterable.forEach((mod) => {
               const ticks = preMainReferences[mod.resource] || 0
               preMainReferences[mod.resource] = ticks + 1;
               // 将同时在2个分包即以上下引用的模块需要提升为主包
-              if(ticks > 0){
+              if (ticks > 0) {
                 this.mainReferences[mod.resource] = true;
               }
             });
           }
         });
       // 开始资源拆包
-      chunks
+      originChunks
         .filter((chunk) => chunk.hasRuntime() && chunk.name)
         .map((chunk) => {
           const name = chunk.name.split('@').shift();
           const pack = this.packagesMap[name] || {};
-          chunk.modulesIterable.forEach((mod) => {
+          const modulesIterable = WebpackVersion.getModulesIterable(compilation, chunk);
+          modulesIterable.forEach((mod) => {
             if (mod.userRequest) {
-              this.handleAddChunk(addChunk, mod, chunk, pack, this.mainReferences);
+              this.handleAddChunk(compilation, mod, chunk, pack, this.mainReferences);
             }
           });
         });
@@ -413,13 +430,16 @@ class WxAppModulePlugin {
     });
     compilation.hooks.chunkAsset.tap('WxAppModulePlugin', (chunk, name) => {
       const mainReferences = this.mainReferences;
-      chunk.modulesIterable.forEach((mod) => {
+      const modulesIterable = WebpackVersion.getModulesIterable(compilation, chunk);
+      modulesIterable.forEach((mod) => {
         // 将当前模块的所有输出，根据包来决定是独立输出到子包目录下，还是主目录下
         chunk.files = this.renderAssets(mod, [name], compilation.assets, mainReferences);
       });
     });
+    const name = 'processAssets' in compilation.hooks ? 'processAssets' : 'additionalChunkAssets';
     // 处理块输出
-    compilation.hooks.additionalChunkAssets.tap('WxAppModulePlugin', (chunks) => {
+    compilation.hooks[name].tap('WxAppModulePlugin', () => {
+      const chunks = compilation.chunks;
       const mainReferences = this.mainReferences;
       chunks.forEach((chunk) => {
         const mod = chunk.mod;
@@ -559,7 +579,8 @@ class WxAppModulePlugin {
   /**
    * 处理文件输出
    */
-  handleAddChunk(addChunk, mod, chunk, pack, mainReferences) {
+  handleAddChunk(compilation, mod, chunk, pack, mainReferences) {
+    const addChunk = compilation.addChunk.bind(compilation);
     const info = path.parse(NameResolve.getProjectRelative(this.projectRoot, mod.userRequest));
     let name = path.join(info.dir, info.name);
     let nameWith = name + info.ext;
@@ -586,11 +607,10 @@ class WxAppModulePlugin {
       newChunk.addGroup(entrypoint);
     }
     if (newChunk) {
-      newChunk.addModule(mod);
-      mod.addChunk(newChunk);
+      WebpackVersion.connectChunkAndModule(compilation, newChunk, mod);
     }
     if (newChunk !== chunk) {
-      mod.removeChunk(chunk);
+      WebpackVersion.disconnectChunkAndModule(compilation, chunk, mod);
     }
   }
 
@@ -600,9 +620,12 @@ class WxAppModulePlugin {
    */
   registerModuleTemplate(compilation) {
     const replacement = this.replacement.bind(this);
-    compilation.mainTemplate.hooks.render.tap('WxAppModulePlugin', (bootstrapSource, chunk, hash, moduleTemplate, dependencyTemplates) => {
+    const hooks = WebpackVersion.getJavascriptModule(compilation);
+    hooks.render.tap('WxAppModulePlugin', (bootstrapSource, chunk, hash, moduleTemplate, dependencyTemplates) => {
       const source = new ConcatSource();
-      chunk.modulesIterable.forEach((module) => {
+      // webpack 5
+      const modulesIterable = WebpackVersion.getModulesIterable(compilation, chunk);
+      modulesIterable.forEach((module) => {
         const ext = path.extname(module.userRequest);
         let moduleSource = null;
         switch (ext) {
@@ -616,6 +639,9 @@ class WxAppModulePlugin {
                 moduleSource = new ConcatSource();
                 const name = this.exec(source).replace(/(^\/|_\/)/g, '');
                 moduleSource.add(`module.exports = "/${this.tranformPackUrl(module, name).replace(/\.\//g, '')}"`);
+              } else if ('chunk' in chunk) {
+                // webpack 5
+                moduleSource = module.source(chunk.dependencyTemplates, chunk.runtimeTemplate)._source;
               } else {
                 moduleSource = module.source(dependencyTemplates, moduleTemplate.outputOptions, moduleTemplate.requestShortener);
               }
@@ -629,15 +655,20 @@ class WxAppModulePlugin {
     });
   }
 
+
+
   /**
    * 注册normal module loader
    */
   registerNormalModuleLoader(compilation) {
-    compilation.plugin('normal-module-loader', function (loaderContext, module) {
-      const exec = loaderContext.exec.bind(loaderContext);
-      loaderContext.exec = function (code, filename) {
-        return exec(code, filename.split('!').pop());
-      };
+    const normalModuleLoader = WebpackVersion.getNormalModuleLoader(compilation);
+    normalModuleLoader.tap('WxAppModulePlugin', function (loaderContext, module) {
+      if (loaderContext.exec) {
+        const exec = loaderContext.exec.bind(loaderContext);
+        loaderContext.exec = function (code, filename) {
+          return exec(code, filename.split('!').pop());
+        };
+      }
     });
   }
 

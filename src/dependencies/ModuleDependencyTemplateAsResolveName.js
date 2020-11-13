@@ -5,13 +5,10 @@
  *      从而实现 require(模块名称)  而不是require(模块id)
  */
 var path = require('path')
-var CommonJsRequireDependency = require('webpack/lib/dependencies/CommonJsRequireDependency.js')
-var HarmonyImportDependency = require('webpack/lib/dependencies/HarmonyImportDependency.js')
 var NameResolve = require('./NameResolve');
 
 var Nodes_Module_Name = "";
 var ProjectRoot = null;
-
 var runtimeAlias = {};
 
 /**
@@ -21,47 +18,61 @@ var runtimeAlias = {};
 function ModuleDependencyTemplateAsResolveName() {
 }
 
+ModuleDependencyTemplateAsResolveName.prototype.getSource = function (source) {
+  if (typeof source.source === 'function') {
+    return source.source();
+  } else {
+    return source._source._value || source._source._valueAsString;
+  }
+}
+
 /**
  * 依赖模块引用替换处理
  */
-ModuleDependencyTemplateAsResolveName.prototype.apply = function (dep, source, outputOptions, requestShortener) {
-  if (!dep.range) return;
-  if (!dep.module) return;
-  var module = dep.module
-  var request = dep.userRequest
-  var content = request
-  var resource = runtimeAlias[module.resource] || module.resource;
-  var sourcePath = source._source._name
-  var isRequirejs = (request.indexOf('./') > -1 || request.indexOf('../') > -1) || request.indexOf('image!') == 0;
-  var cExtName = path.extname(content);
-  var extName = path.extname(resource || content)
-  var hasAssets = Object.keys(module.assets || {}).length > 0;
-  var original = source._source._value.substring(dep.range[0], dep.range[1] - 1);
+ModuleDependencyTemplateAsResolveName.prototype.apply = function (dep, source, outputOptions) {
+  try {
+    var module = outputOptions.moduleGraph ? outputOptions.moduleGraph.getModule(dep) : dep.module;
+    if (!dep.range) return;
+    if (!module) return;
+    var request = dep.userRequest
+    var sourcePath = 'module' in outputOptions ? outputOptions.module.resource : source._source._name
+    var content = this.resolve(request, sourcePath, module);
+    var original = this.getSource(source).substring(dep.range[0], dep.range[1] - 1);
+    if (content.indexOf('css-loader') > -1) {
+      content = this.absoluteResolve(content, sourcePath);
+    } else {
+      content = NameResolve.getChunkName(content, Nodes_Module_Name);
+    }
+    if (dep.type === 'harmony import') {
+      var prefix = original.split(' from ')[0];
+      source.replace(dep.range[0], dep.range[1] - 1, prefix + ' from  \'' + content + '\'');
+    } else {
+      source.replace(dep.range[0], dep.range[1] - 1, '\'' + content + '\'');
+    }
+  } catch (ex) {
+    throw new Error(ex.stack);
+  }
+}
 
+ModuleDependencyTemplateAsResolveName.prototype.resolve = function (content, sourcePath, depModule) {
+  var resource = runtimeAlias[depModule.resource] || depModule.resource;
+  var hasAssets = Object.keys(depModule.assets || {}).length > 0;
+  var extName = path.extname(resource || content);
+  var cExtName = path.extname(content);
+  var isRequirejs = (content.indexOf('./') > -1 || content.indexOf('../') > -1) || content.indexOf('image!') == 0;
   if (path.isAbsolute(content)) {
-    content = this.absoluteResolve(content, sourcePath);
+    return this.absoluteResolve(content, sourcePath);
   } else if (resource && isRequirejs) {
-    content = this.relativeResolve(sourcePath, resource);
+    return this.relativeResolve(sourcePath, resource);
   } else if (hasAssets && extName && extName != '.js') {
-    content = this.assetsResolve(content, extName);
+    return this.assetsResolve(content, extName);
   } else if (content.indexOf('/') > -1 && cExtName !== extName && cExtName !== '.js') {
-    content = this.moduleFileResolve(content, resource, extName, sourcePath);
+    return this.moduleFileResolve(content, resource, extName, sourcePath);
   } else if (extName !== '' && extName !== '.js') {
     var info = path.parse(content)
-    content = path.join(info.dir, info.name + extName + '.js').replace(/\\/g, '/');
+    return path.join(info.dir, info.name + extName + '.js').replace(/\\/g, '/');
   } else {
-    content = this.relativeResolve(sourcePath, resource)
-  }
-  if (content.indexOf('css-loader') > -1) {
-    content = this.absoluteResolve(content, sourcePath);
-  } else {
-    content = NameResolve.getChunkName(content, Nodes_Module_Name);
-  }
-  if (dep.type === 'harmony import') {
-    var prefix = original.split(' from ')[0];
-    source.replace(dep.range[0], dep.range[1] - 1, prefix + ' from  \'' + content + '\'');
-  } else {
-    source.replace(dep.range[0], dep.range[1] - 1, '\'' + content + '\'');
+    return this.relativeResolve(sourcePath, resource)
   }
 }
 
@@ -113,9 +124,7 @@ ModuleDependencyTemplateAsResolveName.prototype.moduleFileResolve = function (co
   return this.relativeResolve(sourcePath, resolve);
 }
 
-// 覆盖默认模板
-CommonJsRequireDependency.Template = ModuleDependencyTemplateAsResolveName
-HarmonyImportDependency.Template = ModuleDependencyTemplateAsResolveName;
+module.exports = ModuleDependencyTemplateAsResolveName
 
 module.exports.setOptions = function (options) {
   Nodes_Module_Name = options.nodeModulesName;

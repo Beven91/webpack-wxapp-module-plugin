@@ -4,8 +4,6 @@
  * 描述：用于替换RequireHeaderDependency.Template 
  *      从而实现 在打包后的文件 不是使用_webpack_require 还是使用require引用模块
  */
-var RequireHeaderDependency = require('webpack/lib/dependencies/RequireHeaderDependency.js')
-
 function NodeRequireHeaderDependencyTemplate () {
 }
 
@@ -17,4 +15,4 @@ NodeRequireHeaderDependencyTemplate.prototype.applyAsTemplateArgument = function
   source.replace(dep.range[0], dep.range[1] - 1, 'require')
 }
 
-RequireHeaderDependency.Template = NodeRequireHeaderDependencyTemplate
+module.exports = NodeRequireHeaderDependencyTemplate;
