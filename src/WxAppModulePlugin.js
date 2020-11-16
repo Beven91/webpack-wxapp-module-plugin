@@ -75,6 +75,10 @@ class WxAppModulePlugin {
       WebpackVersion.initializeWebpackDependencies(compilation);
     });
     compiler.hooks.thisCompilation.tap('WxAppModulePlugin', (compilation) => {
+      if (compiler.name !== compilation.name) {
+        // 如果是一些子编译器任务，则直接略过
+        return;
+      }
       try {
         this.initPackages();
         // 自动根据app.js作为入口，分析哪些文件需要单独产出，以及node_modules使用了哪些模块
@@ -497,7 +501,12 @@ class WxAppModulePlugin {
         const size = content.length;
         assets[name] = {
           size: () => size,
-          source: () => content,
+          source: () => {
+            if (/auth/.test(name)) {
+              var s = 10;
+            }
+            return content
+          },
         };
       });
     });

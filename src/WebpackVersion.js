@@ -43,10 +43,13 @@ class WebpackVersion {
       const CommonJsFullRequireDependency = require('webpack/lib/dependencies/CommonJsFullRequireDependency');
       const HarmonyExportDependencyTemplate = require('./dependencies/HarmonyExportDependencyTemplate');
       const NodeCommonJsFullRequireDependencyTemplate = require('./dependencies/NodeCommonJsFullRequireDependencyTemplate');
+      const CommonJsExportRequireDependency = require('webpack/lib/dependencies/CommonJsExportRequireDependency')
+      const NodeCommonJsExportRequireDependency = require('./dependencies/NodeCommonJsExportRequireDependency');
       // 兼容harmony模块导出兼容
       compilation.dependencyTemplates.set(HarmonyExportExpressionDependency, new HarmonyExportDependencyTemplate());
       // 重新设置 CommonJsFullRequireDependency 用于将webpack_require转换成 require
       compilation.dependencyTemplates.set(CommonJsFullRequireDependency, new NodeCommonJsFullRequireDependencyTemplate());
+      compilation.dependencyTemplates.set(CommonJsExportRequireDependency, new NodeCommonJsExportRequireDependency());
     }
   }
 
