@@ -288,11 +288,31 @@ class WxAppModulePlugin {
     }
     const request = usingPath.replace('node_modules/', '');
     module.paths.unshift.apply(module.paths, paths);
-    const full = require.resolve(request);
+    const full = this.resolve(request);
     module.paths.splice(0, paths.length);
     return full;
   }
 
+  resolve(request) {
+    const pkg = this.resolvePackage(request);
+    if (pkg) {
+      const main = pkg ? pkg.miniprogram : ''
+      request = !main ? request : request.replace(new RegExp('^' + pkg.name), pkg.name + '/' + main);
+    }
+    return require.resolve(request);
+  }
+
+  resolvePackage(request) {
+    const segments = request.split("/");
+    for (let i = 1, k = segments.length; i < k; i++) {
+      const id = segments.slice(0, i).join('/') + '/package.json';
+      try {
+        return require(id);
+      } catch{
+      }
+    }
+  }
+  
   /**
    * 获取app.json配置的图标
    * @param {Object} config app.json内容

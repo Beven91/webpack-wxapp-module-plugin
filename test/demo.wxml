@@ -1,0 +1,13 @@
+<import src="./a.wxml" />
+
+<image src="./a.jpg" />
+
+<audio src="./audio.mp3" />
+
+<audio asrc="./audio.mp3" />
+
+<video src="./video.mp4" />
+
+<image src="{{imgUrl}}" />
+
+<image src="./a/a/b{{imgUrl}}" />
