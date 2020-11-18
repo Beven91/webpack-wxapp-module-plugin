@@ -1,0 +1,5 @@
+const a = require('./util.wxs');
+
+module.exports = {
+  a:a
+}

@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const wxmlLoader = require('../wxml-loader');
+const wxsLoader = require('../wxs-loader');
 
-const content = fs.readFileSync(path.join(__dirname, './sources/demo.wxml')).toString('utf-8');
+const content = fs.readFileSync(path.join(__dirname, './sources/demo.wxs')).toString('utf-8');
 
 const ctx = {
 
@@ -28,4 +28,4 @@ const ctx = {
   },
 }
 
-wxmlLoader.call(ctx, content);
+wxsLoader.call(ctx, content);
