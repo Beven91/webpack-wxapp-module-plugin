@@ -11,3 +11,5 @@
 <image src="{{imgUrl}}" />
 
 <image src="./a/a/b{{imgUrl}}" />
+
+<a src="./aaa.url" />

@@ -94,8 +94,8 @@ class WxAppModulePlugin {
         // 注册 normal-module-loader
         this.registerNormalModuleLoader(compilation);
       } catch (ex) {
-        if (compilation.logger) {
-          compilation.logger.error(ex);
+        if (compilation.errors) {
+          compilation.errors.push(ex.stack);
         } else {
           throw new Error(ex.stack);
           // compilation.errors.push(ex);
@@ -312,7 +312,7 @@ class WxAppModulePlugin {
       }
     }
   }
-  
+
   /**
    * 获取app.json配置的图标
    * @param {Object} config app.json内容
@@ -337,6 +337,7 @@ class WxAppModulePlugin {
    */
   registerModuleEntry(compiler) {
     const packages = this.packages;
+    const jsonAssets = Object.keys(this.jsonAssets);
     // 遍历所有包
     packages.forEach((pack) => {
       const pages = pack.pages.map((f) => this.getModuleFullPath(f));
@@ -354,6 +355,11 @@ class WxAppModulePlugin {
         this.resourceModulesMap[f] = true;
       });
     });
+
+    jsonAssets.forEach((id) => {
+      const file = id + '.json';
+      (new SingleEntryPlugin(this.projectRoot, file, '__jsonAssets__')).apply(compiler);
+    })
   }
 
   /**
@@ -428,6 +434,9 @@ class WxAppModulePlugin {
           const name = chunk.name.split('@').shift();
           const pack = this.packagesMap[name] || {};
           const modulesIterable = WebpackVersion.getModulesIterable(compilation, chunk);
+          if (chunk.name === '__jsonAssets__') {
+            return;
+          }
           modulesIterable.forEach((mod) => {
             if (mod.userRequest) {
               this.handleAddChunk(compilation, mod, chunk, pack, this.mainReferences);

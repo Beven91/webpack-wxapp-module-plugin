@@ -42,6 +42,7 @@ function resolveDependencies(content, options) {
         case 'video':
         case 'audio':
         case 'import':
+        case 'wxs':
           // <import src="">
           addDependency(dependencies, node.attributeMap['src'], node);
           break;
@@ -67,7 +68,7 @@ function addDependency(dependencies, attr, node) {
 }
 
 function getRefValue(node, refKeys) {
-  for (let i = 0, k = refKeys.length; i++; i < k) {
+  for (let i = 0, k = refKeys.length; i < k; i++) {
     const value = node.attributeMap[refKeys[i]];
     if (value) {
       return value;
