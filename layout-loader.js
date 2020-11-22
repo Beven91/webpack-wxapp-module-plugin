@@ -20,7 +20,7 @@ module.exports = function (content) {
   const layout = path.join(context, 'app.wxml');
   const isPage = pages.indexOf(pageName) > -1;
   if (!isPage) {
-    // 如果没有母版页
+    // 如果不是页面组件
     return content;
   }
   if (options.component) {
