@@ -41,8 +41,53 @@ module.exports = {
     libraryTarget: 'commonjs2'
   },
   plugins:[
-    new WxappModulePlugin('指定node_modules模块打包后的存放目录名称，例如:vendor')
-  ]
+    new WxappModulePlugin('npm_modules', ['.scss'], {
+      // 全局组件
+      globalComponents:{
+        // 'layout-master':'my/index'
+      }
+    }),
+  ],
+  module:{
+    rules:[
+      // wxs
+      {
+        test: /\.wxs$/,
+        use: [
+          {
+            loader: 'file-loader',
+            options: {
+              name: '[path][name].wxml',
+              esModule: false,
+            },
+          },
+          'webpack-wxapp-module-plugin/wxs-loader',
+        ],
+      },
+      // wxml
+       {
+        test: /\.wxml$/,
+        use: [
+          {
+            loader: 'file-loader',
+            options: {
+              name: '[path][name].wxml',
+              esModule: false,
+            },
+          },
+          'webpack-wxapp-module-plugin/wxml-loader',
+          {
+            // 母版页支持， 即：可以定义一个app.wxml 或者定义一个组件包裹在所有页面组件
+            loader: 'webpack-wxapp-module-plugin/layout-loader',
+            options:{
+              // 组件模式支持，
+              // component:'master-layout'
+            }
+          },
+        ],
+      },
+    ]
+  }
 }
 ```
 

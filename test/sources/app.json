@@ -1,0 +1,9 @@
+{
+  "pages": ["pages/index/index", "pages/home/index"],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#333",
+    "navigationBarTitleText": "小程序"
+  },
+  "subPackages": []
+}

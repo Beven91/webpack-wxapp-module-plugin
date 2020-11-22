@@ -1,0 +1,4 @@
+<view>
+layout
+  <slot  />
+</view>
