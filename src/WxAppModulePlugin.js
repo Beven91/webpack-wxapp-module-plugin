@@ -496,6 +496,7 @@ class WxAppModulePlugin {
     //  处理页面与组件json输出
     compilation.hooks.optimizeAssets.tap('WxAppModulePlugin', (assets) => {
       const assetKeys = Object.keys(this.jsonAssets);
+      delete assets['app.wxml'];
       assetKeys.forEach((k) => {
         const item = this.jsonAssets[k];
         const request = item.path + '.js';

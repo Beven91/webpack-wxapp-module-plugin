@@ -13,7 +13,7 @@ const runtime = {
 module.exports = function (content) {
   this.cacheable && this.cacheable();
   const options = this.options || this.query || {};
-  const context = this.context;
+  const context = this._compiler.context;
   const segments = path.parse(this.resourcePath);
   const pageName = (segments.dir + '/' + segments.name).replace(/\\/g, '/');
   const pages = getAppPages(path.join(context, 'app.json'));
