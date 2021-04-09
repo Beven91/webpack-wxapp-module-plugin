@@ -50,6 +50,7 @@ class WxAppModulePlugin {
     this.resourceModulesMap = {};
     this.mainReferences = {};
     this.pageOrComponents = {};
+    this.exclude = options.exclude || /(plugin|plugin-private):/i;
     this.globalComponents = options.globalComponents || {};
     this.nodeModulesName = nodeModulesName || NameResolve.nodeModulesName || 'app_node_modules';
     this.typedExtensions = ['.wxml', '.wxss'].concat(extensions || []);
@@ -221,10 +222,11 @@ class WxAppModulePlugin {
       // 如果当前为页面，则进行全局组件附加
       components = this.applyGlobalComponents(components);
     }
+    const exclude = this.exclude;
     const componentKeys = Object.keys(components);
     componentKeys.forEach((name) => {
       const usingPath = NameResolve.usingComponentNormalize((components[name] || ''));
-      if (!/plugin:/.test(usingPath)) {
+      if (!exclude.test(usingPath)) {
         const isNodeModules = usingPath.indexOf('node_modules/') === 0;
         let componentEntry = null;
         if (!isNodeModules) {
@@ -370,12 +372,12 @@ class WxAppModulePlugin {
               mod.mpPack = pack;
               this.mainReferences[mod.resource] = true;
             });
-          }else{
+          } else {
             chunk.modulesIterable.forEach((mod) => {
               const ticks = preMainReferences[mod.resource] || 0
               preMainReferences[mod.resource] = ticks + 1;
               // 将同时在2个分包即以上下引用的模块需要提升为主包
-              if(ticks > 0){
+              if (ticks > 0) {
                 this.mainReferences[mod.resource] = true;
               }
             });
