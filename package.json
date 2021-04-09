@@ -13,6 +13,9 @@
   "bugs": {
     "url": "https://github.com/Beven91/webpack-wxapp-module-plugin/issues"
   },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "homepage": "https://github.com/Beven91/webpack-wxapp-module-plugin#readme",
   "dependencies": {
     "fs-extra": "^5.0.0",
