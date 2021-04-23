@@ -51,6 +51,7 @@ class WxAppModulePlugin {
     this.resourceModulesMap = {};
     this.mainReferences = {};
     this.pageOrComponents = {};
+    this.exclude = options.exclude || /(plugin|plugin-private):/i;
     this.globalComponents = options.globalComponents || {};
     this.nodeModulesName = nodeModulesName || NameResolve.nodeModulesName || 'app_node_modules';
     this.typedExtensions = ['.wxml', '.wxss'].concat(extensions || []);
@@ -238,10 +239,11 @@ class WxAppModulePlugin {
       // 如果当前为页面，则进行全局组件附加
       components = this.applyGlobalComponents(components);
     }
+    const exclude = this.exclude;
     const componentKeys = Object.keys(components);
     componentKeys.forEach((name) => {
       const usingPath = NameResolve.usingComponentNormalize((components[name] || ''));
-      if (!/plugin:/.test(usingPath)) {
+      if (!exclude.test(usingPath)) {
         const isNodeModules = usingPath.indexOf('node_modules/') === 0;
         let componentEntry = null;
         if (!isNodeModules) {
@@ -308,7 +310,7 @@ class WxAppModulePlugin {
       const id = segments.slice(0, i).join('/') + '/package.json';
       try {
         return require(id);
-      } catch{
+      } catch {
       }
     }
   }
@@ -493,6 +495,7 @@ class WxAppModulePlugin {
    * 处理小程序组件与页面的json配置
    */
   renderJsonAssets(compilation) {
+    const exclude = this.exclude;
     //  处理页面与组件json输出
     compilation.hooks.optimizeAssets.tap('WxAppModulePlugin', (assets) => {
       const assetKeys = Object.keys(this.jsonAssets);
@@ -517,7 +520,7 @@ class WxAppModulePlugin {
           const dependencies = item.dependencies;
           usingKeys.forEach((using) => {
             const componentPath = usingComponents[using];
-            if (/plugin:/.test(componentPath)) {
+            if (exclude.test(componentPath)) {
               return;
             }
             const dependency = dependencies[using];
