@@ -200,18 +200,30 @@ class WxAppModulePlugin {
       this.registryPages.push(page);
     });
     currentPages.forEach((page) => {
-      page = /\.js$/.test(page) ? page : page + '.js';
+      // console.log('page',page);
+      page = /\.js$/.test(page) ? page : this.findAbsolutePath(page);
       pack.pages.push(page);
     });
     // 获取绝对路径
     return pack;
   }
 
+  findAbsolutePath(name) {
+    const extensions = ['', '.js', '.ts'];
+    const ext = extensions.find((ext) => {
+      if (path.isAbsolute(name)) {
+        return fse.existsSync(name + ext);
+      }
+      return fse.existsSync(path.join(this.projectRoot, name + ext));
+    });
+    return name + ext;
+  }
+
   // 添加json配置文件到jsonAsset
   addJsonAsset(item) {
     if (!this.jsonAssets[item.path]) {
       this.jsonAssets[item.path] = item;
-      this.pageOrComponents[item.path + '.js'] = true;
+      this.pageOrComponents[item.path] = true;
     }
   }
 
@@ -255,7 +267,7 @@ class WxAppModulePlugin {
         const full = this.getModuleFullPath(componentEntry);
         const parts = path.parse(full);
         const namePath = path.join(parts.dir, parts.name);
-        const fullName = full + '.js';
+        const fullName = this.findAbsolutePath(full);
         if (!fse.existsSync(fullName)) {
           throw new Error('找不到组件: ' + full + '\n     at ' + modulePath + '.json');
         }
@@ -298,14 +310,14 @@ class WxAppModulePlugin {
   resolve(request) {
     const pkg = this.resolvePackage(request);
     if (pkg) {
-      const main = pkg ? pkg.miniprogram : ''
+      const main = pkg ? pkg.miniprogram : '';
       request = !main ? request : request.replace(new RegExp('^' + pkg.name), pkg.name + '/' + main);
     }
     return require.resolve(request);
   }
 
   resolvePackage(request) {
-    const segments = request.split("/");
+    const segments = request.split('/');
     for (let i = 1, k = segments.length; i < k; i++) {
       const id = segments.slice(0, i).join('/') + '/package.json';
       try {
@@ -361,7 +373,7 @@ class WxAppModulePlugin {
     jsonAssets.forEach((id) => {
       const file = id + '.json';
       (new SingleEntryPlugin(this.projectRoot, file, '__jsonAssets__')).apply(compiler);
-    })
+    });
   }
 
   /**
@@ -378,11 +390,10 @@ class WxAppModulePlugin {
             return callback(err);
           } else if (!isUrlExportRegexp.test(src)) {
             return callback(err, src);
-          } else {
-            const myRequest = this.exec(src).replace(/(^\/|_\/)/g, '');
-            const mod = loaderContext._module;
-            return callback(err, `module.exports =  "/${this.tranformPackUrl(mod, myRequest).replace(/\.\//g, '')}"`);
           }
+          const myRequest = this.exec(src).replace(/(^\/|_\/)/g, '');
+          const mod = loaderContext._module;
+          return callback(err, `module.exports =  "/${this.tranformPackUrl(mod, myRequest).replace(/\.\//g, '')}"`);
         });
       };
       Object.defineProperty(loaderContext, 'loadModule', {
@@ -420,7 +431,7 @@ class WxAppModulePlugin {
             });
           } else {
             modulesIterable.forEach((mod) => {
-              const ticks = preMainReferences[mod.resource] || 0
+              const ticks = preMainReferences[mod.resource] || 0;
               preMainReferences[mod.resource] = ticks + 1;
               // 将同时在2个分包即以上下引用的模块需要提升为主包
               if (ticks > 0) {
@@ -502,7 +513,7 @@ class WxAppModulePlugin {
       delete assets['app.wxml'];
       assetKeys.forEach((k) => {
         const item = this.jsonAssets[k];
-        const request = item.path + '.js';
+        const request = item.path;// + '.js';
         if (!this.pageOrComponents[request]) {
           throw new Error('找不到组件:' + item.path);
         }
@@ -524,7 +535,7 @@ class WxAppModulePlugin {
               return;
             }
             const dependency = dependencies[using];
-            const key = this.pageOrComponents[dependency + '.js'];
+            const key = this.pageOrComponents[dependency];
             const fullUsingPath = path.join(this.projectRoot, key);
             const relativePath = NameResolve.getTargetRelative(this.projectRoot, targetContext, fullUsingPath);
             usingComponents[using] = NameResolve.getChunkName(relativePath.replace('.js', ''), this.nodeModulesName);
@@ -535,10 +546,7 @@ class WxAppModulePlugin {
         assets[name] = {
           size: () => size,
           source: () => {
-            if (/auth/.test(name)) {
-              var s = 10;
-            }
-            return content
+            return content;
           },
         };
       });
@@ -573,9 +581,8 @@ class WxAppModulePlugin {
         const name = key.replace(/_\//g, '');
         this.replaceAsset(name, key, mod, assets);
         return name;
-      } else {
-        return key;
       }
+      return key;
     });
   }
 
@@ -636,9 +643,10 @@ class WxAppModulePlugin {
       name = this.tranformPackUrl(mod, name);
       nameWith = name + info.ext;
     }
-    name = name + (info.ext === '.js' ? '.js' : info.ext + '.js');
-    if (this.pageOrComponents[resource]) {
-      this.pageOrComponents[resource] = name;
+    const idKey = resource.replace(info.ext, '');
+    name = name + ((info.ext === '.js' || info.ext == '.ts') ? '.js' : info.ext + '.js');
+    if (this.pageOrComponents[idKey]) {
+      this.pageOrComponents[idKey] = name;
     }
     this.Resolve.setAliasModule(mod, path.join(this.projectRoot, name));
     if (!newChunk) {
@@ -682,7 +690,6 @@ class WxAppModulePlugin {
                 const name = this.exec(source).replace(/(^\/|_\/)/g, '');
                 moduleSource.add(`module.exports = "/${this.tranformPackUrl(module, name).replace(/\.\//g, '')}"`);
               } else if ('chunk' in chunk) {
-                // webpack 5
                 moduleSource = module.source(chunk.dependencyTemplates, chunk.runtimeTemplate)._source;
               } else {
                 moduleSource = module.source(dependencyTemplates, moduleTemplate.outputOptions, moduleTemplate.requestShortener);
@@ -696,7 +703,6 @@ class WxAppModulePlugin {
       return source;
     });
   }
-
 
 
   /**

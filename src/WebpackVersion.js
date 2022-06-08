@@ -13,7 +13,7 @@ class WebpackVersion {
     try {
       require.resolve(id);
       return true;
-    } catch{
+    } catch {
       return false;
     }
   }
@@ -49,7 +49,11 @@ class WebpackVersion {
       compilation.dependencyTemplates.set(HarmonyExportExpressionDependency, new HarmonyExportDependencyTemplate());
       // 重新设置 CommonJsFullRequireDependency 用于将webpack_require转换成 require
       compilation.dependencyTemplates.set(CommonJsFullRequireDependency, new NodeCommonJsFullRequireDependencyTemplate());
-      compilation.dependencyTemplates.set(CommonJsExportRequireDependency, new NodeCommonJsExportRequireDependency());
+      compilation.dependencyTemplates.set(CommonJsExportRequireDependency, new NodeCommonJsExportRequireDependency(
+        compilation,
+        compilation.outputOptions,
+        compilation.requestShortener
+      ));
     }
   }
 
@@ -59,7 +63,7 @@ class WebpackVersion {
   getChunkGraph() {
     try {
       return require('webpack/lib/ChunkGraph');
-    } catch{
+    } catch {
       return null;
     }
   }
@@ -102,7 +106,7 @@ class WebpackVersion {
     try {
       const JavascriptModulesPlugin = require('webpack/lib/javascript/JavascriptModulesPlugin');
       return JavascriptModulesPlugin.getCompilationHooks(compilation);
-    } catch{
+    } catch {
       return compilation.mainTemplate.hooks;
     }
   }
