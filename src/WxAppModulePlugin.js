@@ -689,6 +689,8 @@ class WxAppModulePlugin {
                 moduleSource = new ConcatSource();
                 const name = this.exec(source).replace(/(^\/|_\/)/g, '');
                 moduleSource.add(`module.exports = "/${this.tranformPackUrl(module, name).replace(/\.\//g, '')}"`);
+              } else if (compilation.codeGenerationResults) {
+                moduleSource = compilation.codeGenerationResults.getSource(module, chunk.runtime, 'javascript');
               } else if ('chunk' in chunk) {
                 moduleSource = module.source(chunk.dependencyTemplates, chunk.runtimeTemplate)._source;
               } else {
