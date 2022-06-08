@@ -63,6 +63,7 @@ class WxAppModulePlugin {
 
   apply(compiler) {
     this.options = compiler.options;
+    this.options.optimization.splitChunks = null;
     this.projectRoot = this.options.context;
     this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName, projectRoot: this.projectRoot });
     const definePlugin = new webpack.DefinePlugin({
