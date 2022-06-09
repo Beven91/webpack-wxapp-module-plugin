@@ -305,7 +305,7 @@ class WxAppModulePlugin {
     module.paths.unshift.apply(module.paths, paths);
     const full = this.resolve(request);
     module.paths.splice(0, paths.length);
-    return full;
+    return full.replace(/\.json$/, '.js');
   }
 
   resolve(request) {
