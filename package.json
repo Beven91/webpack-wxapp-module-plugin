@@ -13,8 +13,7 @@
     "html5parser": "^2.0.0"
   },
   "peerDependencies": {
-    "@babel/core": "*",
-    "webpack-sources": "^1.1.0"
+    "@babel/core": "*"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org"
