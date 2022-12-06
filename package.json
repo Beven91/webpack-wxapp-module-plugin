@@ -1,6 +1,6 @@
 {
   "name": "webpack-wxapp-module-plugin",
-  "version": "4.3.8",
+  "version": "4.7.2",
   "author": {
     "name": "Beven"
   },
@@ -13,8 +13,7 @@
     "html5parser": "^2.0.0"
   },
   "peerDependencies": {
-    "@babel/core": "*",
-    "webpack-sources": "^1.1.0"
+    "@babel/core": "*"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org"

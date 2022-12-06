@@ -56,8 +56,9 @@ function resolveDependencies(content, options) {
 }
 
 function addDependency(dependencies, attr, node) {
-  const url = attr.value.value;
-  if (!attr || !attr.value.value || /\{\{/.test(attr.value.value) || /^(https|http)/.test(url)) {
+  attr = attr || {};
+  const url =  attr.value ? attr.value.value : ''
+  if (!attr || !url || /\{\{/.test(url) || /^(https|http)/.test(url)) {
     // 如果已存在相同依赖，且依赖是一个动态变量值
     return;
   }

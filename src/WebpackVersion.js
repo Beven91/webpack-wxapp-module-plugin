@@ -5,7 +5,6 @@
 const NormalModule = require('webpack/lib/NormalModule');
 
 class WebpackVersion {
-
   /**
    * 判断是否存在指定模块
    */
@@ -22,7 +21,7 @@ class WebpackVersion {
    * 兼容方式，设置相关依赖模板，
    * 主要用于解决，将__webpack_require转换成require,
    * 以及将require输出依赖路径进行转换。
-   * @param {*} compilation 
+   * @param {*} compilation
    */
   initializeWebpackDependencies(compilation) {
     const NodeRequireHeaderDependencyTemplate = require('./dependencies/NodeRequireHeaderDependencyTemplate');
@@ -43,7 +42,7 @@ class WebpackVersion {
       const CommonJsFullRequireDependency = require('webpack/lib/dependencies/CommonJsFullRequireDependency');
       const HarmonyExportDependencyTemplate = require('./dependencies/HarmonyExportDependencyTemplate');
       const NodeCommonJsFullRequireDependencyTemplate = require('./dependencies/NodeCommonJsFullRequireDependencyTemplate');
-      const CommonJsExportRequireDependency = require('webpack/lib/dependencies/CommonJsExportRequireDependency')
+      const CommonJsExportRequireDependency = require('webpack/lib/dependencies/CommonJsExportRequireDependency');
       const NodeCommonJsExportRequireDependency = require('./dependencies/NodeCommonJsExportRequireDependency');
       // 兼容harmony模块导出兼容
       compilation.dependencyTemplates.set(HarmonyExportExpressionDependency, new HarmonyExportDependencyTemplate());
@@ -70,7 +69,7 @@ class WebpackVersion {
 
   /**
    * 清空compilation chunks entrypoints namedChunks
-   * @param {*} compilation 
+   * @param {*} compilation
    */
   clearChunks(compilation) {
     this.compilationDataClean(compilation.chunks);
@@ -95,7 +94,7 @@ class WebpackVersion {
   cloneChunks(chunks) {
     if (chunks instanceof Array) return [].concat(chunks);
     const chunks2 = [];
-    chunks.forEach((chunk) => chunks2.push(chunk))
+    chunks.forEach((chunk) => chunks2.push(chunk));
     return chunks2;
   }
 
@@ -118,9 +117,8 @@ class WebpackVersion {
     const chunkGraph = compilation.chunkGraph;
     if (chunkGraph) {
       return chunkGraph.getChunkModulesIterable(chunk.chunk || chunk);
-    } else {
-      return chunk.modulesIterable;
     }
+    return chunk.modulesIterable;
   }
 
   /**
@@ -150,7 +148,7 @@ class WebpackVersion {
   }
 
   /**
-   * 兼容webpck5 的removeChunk 
+   * 兼容webpck5 的removeChunk
    */
   disconnectChunkAndModule(compilation, chunk, mod) {
     const chunkGraph = compilation.chunkGraph;

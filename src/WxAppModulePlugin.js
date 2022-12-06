@@ -20,6 +20,10 @@ const NameResolve = require('./dependencies/NameResolve');
 
 const subPackRegexp = /subPack:/;
 
+const PROJECT_CONFIG = 'project.config.json';
+
+const PLGUIN_CONFIG = 'plugin.json';
+
 const isUrlExportRegexp = /module.exports(\s+|)=(\s+|)__webpack_public_path__/;
 
 // 取消AMD模式
@@ -51,12 +55,19 @@ class WxAppModulePlugin {
     this.resourceModulesMap = {};
     this.mainReferences = {};
     this.pageOrComponents = {};
+    this.jsonAssets = {};
     this.exclude = options.exclude || /(plugin|plugin-private):/i;
     this.globalComponents = options.globalComponents || {};
     this.nodeModulesName = nodeModulesName || NameResolve.nodeModulesName || 'app_node_modules';
     this.typedExtensions = ['.wxml', '.wxss'].concat(extensions || []);
     this.Resolve = require('./dependencies/ModuleDependencyTemplateAsResolveName.js');
     this.Template = require('./dependencies/NodeRequireHeaderDependencyTemplate.js');
+    this.webpackEntries = {};
+    this.runMode = options.mode == 'plugin' ? 'plugin' : 'miniprogram';
+    this.plugin = { pluginAppid: '', root: options.pluginRoot, entry: null, configIndex: null };
+    this.projectConfigPath = null;
+    this.needGenerateAssets = true;
+    this.compilation = null;
     NameResolve.nodeModulesName = this.nodeModulesName;
     NameResolve.pluginInstance = this;
   }
@@ -76,11 +87,16 @@ class WxAppModulePlugin {
     compiler.hooks.make.tap('WxAppModulePlugin', (compilation) => {
       WebpackVersion.initializeWebpackDependencies(compilation);
     });
+    this.registerConfigEntry(compiler);
+    compiler.hooks.invalid.tap('WxAppModulePlugin', (a) => {
+      this.needGenerateAssets = /\.json$/.test(a);
+    });
     compiler.hooks.thisCompilation.tap('WxAppModulePlugin', (compilation) => {
       if (compiler.name !== compilation.name) {
         // 如果是一些子编译器任务，则直接略过
         return;
       }
+      this.compilation = compilation;
       try {
         this.initPackages();
         // 自动根据app.js作为入口，分析哪些文件需要单独产出，以及node_modules使用了哪些模块
@@ -108,14 +124,30 @@ class WxAppModulePlugin {
   }
 
   /**
+   * 注册配置文件输出
+   */
+  registerConfigEntry(compiler) {
+    const dir = this.runMode == 'plugin' ? this.plugin.root : this.projectRoot;
+    const id = path.join(dir, PROJECT_CONFIG);
+    if (this.runMode == 'plugin') {
+      const root = this.plugin.root;
+      (new SingleEntryPlugin(this.projectRoot, path.join(root, PLGUIN_CONFIG), PLGUIN_CONFIG)).apply(compiler);
+      (new SingleEntryPlugin(this.projectRoot, id, PROJECT_CONFIG)).apply(compiler);
+    } else {
+      (new SingleEntryPlugin(this.projectRoot, id, PROJECT_CONFIG)).apply(compiler);
+    }
+  }
+
+  /**
    * 初始化小程序引用的页面以及组件与对应的资源文件例如:.json .wxss .wxml,tabBarIcons
    * 最终组织成分包形式资源
    */
   initPackages() {
     const config = this.getJson(path.join(this.projectRoot, 'app.json'));
     if (config) {
-      this.packagesMap = {};
       this.jsonAssets = {};
+      this.packagesMap = {};
+      this.mpJsonAssets = {};
       this.readyMainReferences = {};
       // 主包
       const main = this.createPackage('', ['app'].concat(config.pages), 'main');
@@ -133,6 +165,8 @@ class WxAppModulePlugin {
         const root = pack.root;
         packages.push(this.createPackage(root, subPages, 'subPack:' + root, true));
       });
+      // 插件
+      this.initPluginEntries(packages);
       // 将子包相互共享的组件提升到主包
       packages.forEach((pack) => {
         this.packagesMap[pack.name] = pack;
@@ -174,12 +208,34 @@ class WxAppModulePlugin {
     }
   }
 
+  initPluginEntries(packages) {
+    if (this.runMode !== 'plugin') return;
+    const pluginRoot = this.plugin.root;
+    const id = path.join(pluginRoot, PLGUIN_CONFIG);
+    const config = this.getJson(id);
+    const publicComponents = config.publicComponents || {};
+    const pages = Object.keys(config.pages || {}).map((key) => config.pages[key]);
+    const pack = this.createPackage((pluginRoot + '/').replace(/\/\//, '/'), pages, 'plugin:', true, false);
+    const mainIndex = path.join(pluginRoot, config.main);
+    packages.push(pack);
+    Object.keys(publicComponents).forEach((key) => {
+      const name = path.relative(this.projectRoot, path.join(pluginRoot, publicComponents[key]));
+      const userId = this.findAbsolutePath(name);
+      const id = path.join(this.projectRoot, userId);
+      this.addComponent(id, pack.pages, 'plugin.json', false);
+    });
+    if (fse.existsSync(mainIndex)) {
+      pack.pages.push(mainIndex);
+    }
+    this.plugin.configIndex = id;
+  }
+
   /**
    * 创建小程序包的资源
    * @param {String} root 包的基础路径
    * @param {Array} pages  包下的所有页面
    */
-  createPackage(root, pages, packName, subpack) {
+  createPackage(root, pages, packName, subpack, applyGlobal) {
     const pack = {
       name: packName,
       root: root,
@@ -188,15 +244,15 @@ class WxAppModulePlugin {
       subpack: subpack,
       resources: [],
     };
-    const currentPages = (pages || []).map((page) => root + page);
+    const currentPages = (pages || []).map((page) => (root + page));
     currentPages.forEach((page) => {
       const modulePath = this.getModuleFullPath(page);
       const parts = path.parse(modulePath);
       const namePath = path.join(parts.dir, parts.name);
       const dependencies = {};
       // 附加页面引用的所有组件
-      this.pushComponents(currentPages, modulePath, namePath, true, dependencies);
-      this.addJsonAsset({ path: namePath, dependencies: dependencies });
+      this.pushComponents(currentPages, modulePath, namePath, true, dependencies, applyGlobal);
+      this.addPageOrComponentJsonAsset({ path: namePath, dependencies: dependencies });
       // 标记页面
       this.registryPages.push(page);
     });
@@ -221,9 +277,9 @@ class WxAppModulePlugin {
   }
 
   // 添加json配置文件到jsonAsset
-  addJsonAsset(item) {
-    if (!this.jsonAssets[item.path]) {
-      this.jsonAssets[item.path] = item;
+  addPageOrComponentJsonAsset(item) {
+    if (!this.mpJsonAssets[item.path]) {
+      this.mpJsonAssets[item.path] = item;
       this.pageOrComponents[item.path] = true;
     }
   }
@@ -239,16 +295,20 @@ class WxAppModulePlugin {
     }
   }
 
+  existsComponent(id) {
+    return fse.existsSync(id) && fse.lstatSync(id).isFile();
+  }
+
   /**
    * 获取指定小程序页面引用的所有组件
    * @param {Array} pages 目前搜索到的页面组件
    * @param {modulePath} 页面完整路径
    * @param {namePath} 页面模块完整路径不带后缀名
    */
-  pushComponents(pages, modulePath, namePath, isPage, dependencies) {
+  pushComponents(pages, modulePath, namePath, isPage, dependencies, applyGlobal) {
     let components = this.requireJson(namePath + '.json').usingComponents || {};
     const moduleDir = path.dirname(modulePath);
-    if (isPage) {
+    if (isPage && applyGlobal !== false) {
       // 如果当前为页面，则进行全局组件附加
       components = this.applyGlobalComponents(components);
     }
@@ -266,28 +326,33 @@ class WxAppModulePlugin {
           componentEntry = this.resolveModule(modulePath, usingPath).replace('.js', '');
         }
         const full = this.getModuleFullPath(componentEntry);
-        const parts = path.parse(full);
-        const namePath = path.join(parts.dir, parts.name);
-        const fullName = this.findAbsolutePath(full);
-        if (!fse.existsSync(fullName)) {
-          throw new Error('找不到组件: ' + full + '\n     at ' + modulePath + '.json');
-        }
-        if (this.mainReferences[fullName]) {
-        } else if (pages.indexOf(fullName) < 0) {
-          if (this.readyMainReferences[fullName]) {
-            // 如果存在两次引用，则表示是从两个子包依赖了同一个组件，则将组件提升到主包中
-            this.readyMainReferences[fullName] = { name: componentEntry, pack: 'main', namePath: namePath };
-          } else {
-            this.readyMainReferences[fullName] = {};
-          }
-          pages.push(fullName);
-          const myDepdencies = {};
-          this.pushComponents(pages, full, namePath, false, myDepdencies);
-          this.addJsonAsset({ path: namePath, dependencies: myDepdencies });
-        }
+        this.addComponent(full, pages, modulePath, applyGlobal);
         dependencies[name] = full;
       }
     });
+  }
+
+  addComponent(full, pages, context, applyGlobal) {
+    const parts = path.parse(full);
+    const namePath = path.join(parts.dir, parts.name);
+    const fullName = this.findAbsolutePath(full);
+    if (!this.existsComponent(fullName)) {
+      this.compilation.errors.push(new Error('找不到组件: ' + full + '\n     at ' + context + '.json'))
+      return;
+    }
+    if (this.mainReferences[fullName]) {
+    } else if (pages.indexOf(fullName) < 0) {
+      if (this.readyMainReferences[fullName]) {
+        // 如果存在两次引用，则表示是从两个子包依赖了同一个组件，则将组件提升到主包中
+        this.readyMainReferences[fullName] = { name: componentEntry, pack: 'main', namePath: namePath };
+      } else {
+        this.readyMainReferences[fullName] = {};
+      }
+      pages.push(fullName);
+      const myDepdencies = {};
+      this.pushComponents(pages, full, namePath, false, myDepdencies, applyGlobal);
+      this.addPageOrComponentJsonAsset({ path: namePath, dependencies: myDepdencies });
+    }
   }
 
   /**
@@ -352,7 +417,7 @@ class WxAppModulePlugin {
    */
   registerModuleEntry(compiler) {
     const packages = this.packages;
-    const jsonAssets = Object.keys(this.jsonAssets);
+    const jsonAssets = Object.keys(this.mpJsonAssets);
     // 遍历所有包
     packages.forEach((pack) => {
       const pages = pack.pages.map((f) => this.getModuleFullPath(f));
@@ -361,6 +426,10 @@ class WxAppModulePlugin {
       // 将js,.wxss,wxml等资源添加到打包依赖中
       files.forEach((file) => {
         const name = file.split(this.projectRoot).pop();
+        if (this.webpackEntries[file]) {
+          return;
+        }
+        this.webpackEntries[file] = true;
         const chunkName = pack.name + '@' + name;
         (new SingleEntryPlugin(this.projectRoot, file, chunkName)).apply(compiler);
       });
@@ -373,6 +442,10 @@ class WxAppModulePlugin {
 
     jsonAssets.forEach((id) => {
       const file = id + '.json';
+      if (this.webpackEntries[file]) {
+        return;
+      }
+      this.webpackEntries[file] = true;
       (new SingleEntryPlugin(this.projectRoot, file, '__jsonAssets__')).apply(compiler);
     });
   }
@@ -510,10 +583,13 @@ class WxAppModulePlugin {
     const exclude = this.exclude;
     //  处理页面与组件json输出
     compilation.hooks.optimizeAssets.tap('WxAppModulePlugin', (assets) => {
-      const assetKeys = Object.keys(this.jsonAssets);
+      if (this.needGenerateAssets == false) return;
+      // 为了支持微信小程序开发者工具热重载，（除了第一次构建外）这里在不是改动json文件下，其他情况下不输出json assets
+      this.needGenerateAssets = false;
+      const assetKeys = Object.keys(this.mpJsonAssets);
       delete assets['app.wxml'];
       assetKeys.forEach((k) => {
-        const item = this.jsonAssets[k];
+        const item = this.mpJsonAssets[k];
         const request = item.path;// + '.js';
         if (!this.pageOrComponents[request]) {
           throw new Error('找不到组件:' + item.path);
@@ -537,9 +613,11 @@ class WxAppModulePlugin {
             }
             const dependency = dependencies[using];
             const key = this.pageOrComponents[dependency];
-            const fullUsingPath = path.join(this.projectRoot, key);
-            const relativePath = NameResolve.getTargetRelative(this.projectRoot, targetContext, fullUsingPath);
-            usingComponents[using] = NameResolve.getChunkName(relativePath.replace('.js', ''), this.nodeModulesName);
+            if (key) {
+              const fullUsingPath = path.join(this.projectRoot, key);
+              const relativePath = NameResolve.getTargetRelative(this.projectRoot, targetContext, fullUsingPath);
+              usingComponents[using] = NameResolve.getChunkName(relativePath.replace('.js', ''), this.nodeModulesName);
+            }
           });
         }
         const content = JSON.stringify(data, null, 4);
@@ -551,7 +629,54 @@ class WxAppModulePlugin {
           },
         };
       });
+
+      const app = this.getAppJSON();
+      assets['app.json'] = {
+        size: () => app.length,
+        source: () => app,
+      };
+      Object.keys(this.jsonAssets).forEach((k) => {
+        const item = this.jsonAssets[k];
+        const content = item.name == PROJECT_CONFIG ? this.readProjectConfigJson(k) : fse.readFileSync(k);
+        assets[item.name] = {
+          size: () => content.length,
+          source: () => content,
+        };
+      });
     });
+  }
+
+  getAppJSON() {
+    const appJson = this.getJson(path.join(this.projectRoot, 'app.json'));
+    const dir = this.plugin.root || this.projectRoot;
+    const pluginConfig = this.getJson(path.join(dir, PROJECT_CONFIG));
+    this.handleDevPlugin(appJson.plugins, pluginConfig);
+    (appJson.subPackages || []).forEach((sub) => {
+      this.handleDevPlugin(sub.plugins, pluginConfig);
+    });
+    return JSON.stringify(appJson, null, 2);
+  }
+
+  handleDevPlugin(plugins, pluginConfig) {
+    if (this.runMode != 'plugin') return;
+    Object.keys(plugins || {}).forEach((name) => {
+      const plugin = plugins[name];
+      if (plugin.provider == pluginConfig.pluginAppid) {
+        plugin.version = 'dev';
+      }
+    });
+  }
+
+  readProjectConfigJson(id) {
+    const config = this.getJson(id);
+    if (this.runMode == 'plugin') {
+      const pluginRoot = path.dirname(id);
+      const miniprogramRoot = path.join(pluginRoot, config.miniprogramRoot);
+      config.miniprogramRoot = path.relative(this.projectRoot, miniprogramRoot);
+      config.srcMiniprogramRoot = config.miniprogramRoot;
+      config.pluginRoot = path.relative(this.projectRoot, pluginRoot);
+    }
+    return JSON.stringify(config, null, 2);
   }
 
   /**
@@ -645,7 +770,16 @@ class WxAppModulePlugin {
       nameWith = name + info.ext;
     }
     const idKey = resource.replace(info.ext, '');
+    if (info.ext == '.json') {
+      name = name + info.ext;
+      if (name.indexOf(PROJECT_CONFIG) > -1) {
+        name = PROJECT_CONFIG;
+      }
+      this.jsonAssets[mod.resource] = { name: name, content: '' };
+      return;
+    }
     name = name + ((info.ext === '.js' || info.ext == '.ts') ? '.js' : info.ext + '.js');
+
     if (this.pageOrComponents[idKey]) {
       this.pageOrComponents[idKey] = name;
     }
@@ -697,10 +831,10 @@ class WxAppModulePlugin {
               } else {
                 moduleSource = module.source(dependencyTemplates, moduleTemplate.outputOptions, moduleTemplate.requestShortener);
               }
+              replacement(moduleSource);
             }
             break;
         }
-        replacement(moduleSource);
         source.add(moduleSource);
       });
       return source;
@@ -713,7 +847,7 @@ class WxAppModulePlugin {
    */
   registerNormalModuleLoader(compilation) {
     const normalModuleLoader = WebpackVersion.getNormalModuleLoader(compilation);
-    normalModuleLoader.tap('WxAppModulePlugin', function (loaderContext, module) {
+    normalModuleLoader.tap('WxAppModulePlugin', function (loaderContext) {
       if (loaderContext.exec) {
         const exec = loaderContext.exec.bind(loaderContext);
         loaderContext.exec = function (code, filename) {
