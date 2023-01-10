@@ -4,6 +4,7 @@
  */
 const fs = require('fs-extra');
 const path = require('path');
+const Runtime = require('./src/runtime');
 
 const runtime = {
   mtime: null,
@@ -13,7 +14,7 @@ const runtime = {
 module.exports = function (content) {
   this.cacheable && this.cacheable();
   const options = this.options || this.query || {};
-  const context = this._compiler.context;
+  const context = Runtime.appRoot;
   const segments = path.parse(this.resourcePath);
   const pageName = (segments.dir + '/' + segments.name).replace(/\\/g, '/');
   const pages = getAppPages(path.join(context, 'app.json'));

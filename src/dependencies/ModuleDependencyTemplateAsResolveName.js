@@ -10,6 +10,8 @@ var NameResolve = require('./NameResolve');
 var Nodes_Module_Name = "";
 var ProjectRoot = null;
 var runtimeAlias = {};
+var PLUGIN_ROOT = '';
+var symlinks = {};
 
 /**
  * webpack require 使用模块名称作为模块标识
@@ -54,7 +56,24 @@ ModuleDependencyTemplateAsResolveName.prototype.apply = function (dep, source, o
   }
 }
 
+ModuleDependencyTemplateAsResolveName.prototype.isPluginSource = function (id) {
+  return PLUGIN_ROOT && (id || '').toString().indexOf(PLUGIN_ROOT) > -1;
+}
+
 ModuleDependencyTemplateAsResolveName.prototype.resolve = function (content, sourcePath, depModule) {
+  let request = this.internalResolve(content, sourcePath, depModule);
+  const root = path.dirname(sourcePath)
+  const id = path.join(root, request);
+  if (this.isPluginSource(sourcePath) && !this.isPluginSource(id)) {
+    request = request.replace('../','');
+    // const newId = path.join(root, request);
+    // // // 插件引用文件 
+    // symlinks[path.dirname(id)] = path.dirname(newId);
+  }
+  return request;
+}
+
+ModuleDependencyTemplateAsResolveName.prototype.internalResolve = function (content, sourcePath, depModule) {
   var resource = runtimeAlias[depModule.resource] || depModule.resource;
   var hasAssets = Object.keys(depModule.assets || {}).length > 0;
   var extName = path.extname(resource || content);
@@ -124,17 +143,30 @@ ModuleDependencyTemplateAsResolveName.prototype.moduleFileResolve = function (co
   return this.relativeResolve(sourcePath, resolve);
 }
 
-module.exports = ModuleDependencyTemplateAsResolveName
-
-module.exports.setOptions = function (options) {
+ModuleDependencyTemplateAsResolveName.setOptions = function (options) {
   Nodes_Module_Name = options.nodeModulesName;
   ProjectRoot = options.projectRoot;
 }
 
-module.exports.setAliasModule = function (mod, alias) {
+ModuleDependencyTemplateAsResolveName.setAliasModule = function (mod, alias) {
   runtimeAlias[mod.resource] = alias;
 };
 
-module.exports.clearAlias = function () {
+ModuleDependencyTemplateAsResolveName.clearAlias = function () {
   runtimeAlias = {};
 }
+
+ModuleDependencyTemplateAsResolveName.setPluginRoot = function (dir) {
+  PLUGIN_ROOT = dir;
+}
+
+ModuleDependencyTemplateAsResolveName.getSymlinks = function(){
+  return symlinks;
+}
+
+ModuleDependencyTemplateAsResolveName.initSymlinks = function(){
+  symlinks = {};
+}
+
+
+module.exports = ModuleDependencyTemplateAsResolveName

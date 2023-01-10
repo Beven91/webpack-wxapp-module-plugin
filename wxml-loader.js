@@ -3,7 +3,9 @@
  * @description wxml 加载器
  */
 const parser = require('html5parser');
+const path = require('path');
 const loadModule = require('./src/helper/loadModule');
+const Runtime = require('./src/runtime');
 
 const SyntaxKind = parser.SyntaxKind;
 
@@ -14,7 +16,7 @@ module.exports = function (content) {
   try {
     const options = this.options || this.query || {};
     // 搜寻所有依赖
-    const dependencies = resolveDependencies(content, options);
+    const dependencies = resolveDependencies(content, options, this.resourcePath);
     // 将所有依赖加载
     Promise
       .all(dependencies.map((dep) => loadModule(dep.request, this)))
@@ -26,7 +28,7 @@ module.exports = function (content) {
   }
 }
 
-function resolveDependencies(content, options) {
+function resolveDependencies(content, options, resourcePath) {
   const dependencies = [];
   const refKeys = ['src'].concat(options.refKeys || []);
   // 解析wxml内容
@@ -44,10 +46,10 @@ function resolveDependencies(content, options) {
         case 'import':
         case 'wxs':
           // <import src="">
-          addDependency(dependencies, node.attributeMap['src'], node);
+          addDependency(dependencies, node.attributeMap['src'], node, resourcePath);
           break;
         default:
-          addDependency(dependencies, getRefValue(node, refKeys), node);
+          addDependency(dependencies, getRefValue(node, refKeys), node, resourcePath);
           break;
       }
     },
@@ -55,12 +57,18 @@ function resolveDependencies(content, options) {
   return dependencies;
 }
 
-function addDependency(dependencies, attr, node) {
+function addDependency(dependencies, attr, node, resourcePath) {
   attr = attr || {};
-  const url =  attr.value ? attr.value.value : ''
+  let url = attr.value ? attr.value.value : ''
+  const rootRegexp = /^\//;
   if (!attr || !url || /\{\{/.test(url) || /^(https|http)/.test(url)) {
     // 如果已存在相同依赖，且依赖是一个动态变量值
     return;
+  }
+  if (rootRegexp.test(url)) {
+    const absoluteUrl = path.join(Runtime.appRoot, url.replace(rootRegexp, ''));
+    const context = path.dirname(resourcePath);
+    url = path.relative(context, absoluteUrl);
   }
   dependencies.push({
     request: url,
