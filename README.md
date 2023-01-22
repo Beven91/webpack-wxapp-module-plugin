@@ -104,11 +104,24 @@ module.exports = {
 }
 ```
 
-### 五、推荐用例
+### 五、插件使用
+
+```js
+new WxappModulePlugin('npm_modules', ['.scss'], {
+  // 插件配置
+  mode: 'plugin',
+  // 插件模式下，插件代码根目录
+  pluginRoot: path.resolve('src/plugin'),
+})
+
+```
+
+
+### 六、推荐用例
 
 [`freedom`](https://github.com/Beven91/freedom)
 
-### 六、开源许可
+### 七、开源许可
 
 基于 [MIT License](http://zh.wikipedia.org/wiki/MIT_License) 开源，使用代码只需说明来源，或者引用 [license.txt](https://github.com/sofish/typo.css/blob/master/license.txt) 即可。
 
