@@ -57,10 +57,9 @@ function resolveDependencies(content, options, resourcePath) {
   return dependencies;
 }
 
-function addDependency(dependencies, attr, node, resourcePath) {
+function addDependency(dependencies, attr, node) {
   attr = attr || {};
-  let url = attr.value ? attr.value.value : ''
-  const rootRegexp = /^\//;
+  const url =  attr.value ? attr.value.value : ''
   if (!attr || !url || /\{\{/.test(url) || /^(https|http)/.test(url)) {
     // 如果已存在相同依赖，且依赖是一个动态变量值
     return;
