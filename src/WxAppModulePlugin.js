@@ -17,6 +17,7 @@ const HarmonyDetectionParserPlugin = require('webpack/lib/dependencies/HarmonyDe
 const ConcatSource = require('webpack-sources').ConcatSource;
 const WebpackVersion = require('./WebpackVersion');
 const Runtime = require('./runtime');
+const WxWorkerDependency = require('./dependencies/WxWorkerDependency')
 
 const MPEXT = ['.js', '.wxss', '.wxml', '.json', '.js.map'];
 
@@ -113,6 +114,8 @@ class WxAppModulePlugin {
     this.projectRoot = this.options.context;
     this.appRoot = Runtime.appRoot = path.dirname(path.join(this.projectRoot, app));
     this.distRoot = this.options.output.path;
+    this.appConfigPath = path.join(this.appRoot, 'app.json');
+    this.appConfig = this.getJson(this.appConfigPath)
     this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName, projectRoot: this.projectRoot });
 
     const definePlugin = new webpack.DefinePlugin({
@@ -125,7 +128,7 @@ class WxAppModulePlugin {
     compiler.hooks.make.tap('WxAppModulePlugin', (compilation) => {
       WebpackVersion.initializeWebpackDependencies(compilation);
     });
-    this.registerConfigEntry(compiler);
+    this.registerConfigResourcesEntry(compiler);
     compiler.hooks.invalid.tap('WxAppModulePlugin', (a) => {
       this.needGenerateAssets = /\.json$/.test(a);
       this.modifyedEntries[a] = true;
@@ -138,7 +141,7 @@ class WxAppModulePlugin {
         fse.copySync(doc, dest)
       }
     })
-    compiler.hooks.thisCompilation.tap('WxAppModulePlugin', (compilation) => {
+    compiler.hooks.thisCompilation.tap('WxAppModulePlugin', (compilation, { normalModuleFactory }) => {
       if (compiler.name !== compilation.name) {
         // 如果是一些子编译器任务，则直接略过
         return;
@@ -150,6 +153,7 @@ class WxAppModulePlugin {
             const a = entry;
           }
         });
+        this.registerWxWorkerRequire(compiler, normalModuleFactory)
         this.initPackages();
         // 自动根据app.js作为入口，分析哪些文件需要单独产出，以及node_modules使用了哪些模块
         this.registerModuleEntry(compiler);
@@ -239,7 +243,7 @@ class WxAppModulePlugin {
   /**
    * 注册配置文件输出
    */
-  registerConfigEntry(compiler) {
+  registerConfigResourcesEntry(compiler) {
     const dir = this.runMode == 'plugin' ? this.plugin.root : this.appRoot;
     const id = path.join(dir, PROJECT_CONFIG);
     if (this.runMode == 'plugin') {
@@ -249,6 +253,17 @@ class WxAppModulePlugin {
     } else {
       (new SingleEntryPlugin(this.projectRoot, id, PROJECT_CONFIG)).apply(compiler);
     }
+    const appConfig = this.appConfig;
+    const appRoot = path.dirname(this.appConfigPath)
+    const appJsonAssets = [
+      appConfig.sitemapLocation,
+      appConfig.themeLocation
+    ].filter(Boolean);
+    appJsonAssets.forEach((m) => {
+      const file = path.join(appRoot, m);
+      const loader = require.resolve('./loaders/json-loader.js');
+      (new SingleEntryPlugin(this.projectRoot, loader + '!' + file, path.basename(file))).apply(compiler);
+    })
   }
 
   /**
@@ -257,7 +272,7 @@ class WxAppModulePlugin {
    */
   initPackages() {
     const appRoot = this.appRoot;
-    const config = this.getJson(path.join(appRoot, 'app.json'));
+    const config = this.appConfig;
     if (config) {
       this.jsonAssets = {};
       this.packagesMap = {};
@@ -624,6 +639,72 @@ class WxAppModulePlugin {
         set(v) {
           innerLoadModule = v;
         },
+      });
+    });
+  }
+
+  registerWxWorkerRequire(compiler, normalModuleFactory) {
+    const compilation = this.compilation;
+    const CREATE_WORKER_NAME = 'createWorker';
+    compilation.dependencyTemplates.set(WxWorkerDependency, new WxWorkerDependency.Template());
+    compilation.dependencyFactories.set(WxWorkerDependency, normalModuleFactory);
+    normalModuleFactory.hooks.parser.for('javascript/auto').tap('WxAppModulePlugin', (parser) => {
+      // 支持: const { createWorker } = wx; createWorker('aa')
+      parser.hooks.statement.tap('WxAppModulePlugin', (expression) => {
+        if (expression.type !== 'VariableDeclaration') return;
+        const declarations = expression.declarations;
+        let isWxCreateWorker = false;
+        if(declarations.length > 1) {
+          isWxCreateWorker = declarations[0]?.init?.name == 'wx' && declarations[1]?.init?.property?.name == CREATE_WORKER_NAME;
+        } else {
+          isWxCreateWorker = declarations[0]?.init?.object?.name == 'wx' && declarations[0]?.init?.property?.name == CREATE_WORKER_NAME;
+        }
+        if (isWxCreateWorker) {
+          const variable = parser.getVariableInfo(CREATE_WORKER_NAME);
+          if (variable && typeof variable !== 'string') {
+            // 标记作用域中变量的来源标识
+            parser.tagVariable(CREATE_WORKER_NAME, 'wx.createWorker');
+          }
+        }
+      })
+      parser.hooks.statement.tap('WxAppModulePlugin', (expression) => {
+        // 这里还需要判定createWorker是否为wx的createWorker
+        if (expression.type !== 'ExpressionStatement') {
+          return;
+        }
+        expression = expression.expression;
+        if (
+          expression.type === 'CallExpression' &&
+          expression.callee.name === CREATE_WORKER_NAME &&
+          expression.arguments.length === 1 &&
+          expression.arguments[0].type === 'Literal'
+        ) {
+          const variable = parser.getVariableInfo(CREATE_WORKER_NAME);
+          if(variable?.tagInfo?.tag === 'wx.createWorker') {
+            // 确保当前调用的createWorker是wx.createWorker
+            const workerPath = expression.arguments[0].value;
+            const context = parser.state.module.context;
+            const resolvedPath = path.resolve(context, workerPath);
+            const dep = new WxWorkerDependency(resolvedPath, expression.range);
+            dep.loc = expression.loc;
+            parser.state.current.addDependency(dep);
+          }
+        }
+      })
+      // 支持: wx.createWorker('workders/ss')
+      parser.hooks.callMemberChain.for('wx').tap('WxAppModulePlugin', (expression) => {
+        if (
+          expression.callee.property.name === CREATE_WORKER_NAME &&
+          expression.arguments.length === 1 &&
+          expression.arguments[0].type === 'Literal'
+        ) {
+          const workerPath = expression.arguments[0].value;
+          const context = parser.state.module.context;
+          const resolvedPath = path.resolve(context, workerPath);
+          const dep = new WxWorkerDependency(resolvedPath, expression.range);
+          dep.loc = expression.loc;
+          parser.state.current.addDependency(dep);
+        }
       });
     });
   }
@@ -1034,7 +1115,7 @@ class WxAppModulePlugin {
    */
   handleAddChunk(compilation, mod, chunk, pack, mainReferences) {
     const addChunk = compilation.addChunk.bind(compilation);
-    const info = path.parse(NameResolve.getProjectRelative(this.projectRoot, mod.userRequest));
+    const info = path.parse(NameResolve.getProjectRelative(this.projectRoot, mod.userRequest.split('!').pop()));
     let name = path.join(info.dir, info.name);
     let nameWith = name + info.ext;
     const resource = mod.resource;
