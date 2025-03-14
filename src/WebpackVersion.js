@@ -26,15 +26,19 @@ class WebpackVersion {
   initializeWebpackDependencies(compilation) {
     const NodeRequireHeaderDependencyTemplate = require('./dependencies/NodeRequireHeaderDependencyTemplate');
     const NodeModuleDependencyResolveAsName = require('./dependencies/ModuleDependencyTemplateAsResolveName');
-    const RequireHeaderDependency = require('webpack/lib/dependencies/RequireHeaderDependency.js');
-    const CommonJsRequireDependency = require('webpack/lib/dependencies/CommonJsRequireDependency.js');
-    const HarmonyImportDependency = require('webpack/lib/dependencies/HarmonyImportDependency.js');
+    const NodeImportSideEffectDependencyTemplate = require('./dependencies/NodeImportSideEffectDependencyTemplate');
+    const RequireHeaderDependency = require('webpack/lib/dependencies/RequireHeaderDependency');
+    const CommonJsRequireDependency = require('webpack/lib/dependencies/CommonJsRequireDependency');
+    const HarmonyImportDependency = require('webpack/lib/dependencies/HarmonyImportDependency');
+    const HarmonyImportSideEffectDependency = require('webpack/lib/dependencies/HarmonyImportSideEffectDependency')
     // 重新设置RequireHeaderDependency 依赖的模板，用于将webpack_require转换成 require
     compilation.dependencyTemplates.set(RequireHeaderDependency, new NodeRequireHeaderDependencyTemplate());
     // 重新设置CommonJsRequireDependency依赖模板，用于进行require中的路径转换
     compilation.dependencyTemplates.set(CommonJsRequireDependency, new NodeModuleDependencyResolveAsName());
     // 重新设置HarmonyImportDependency依赖模板，用于进行require中的路径转换
     compilation.dependencyTemplates.set(HarmonyImportDependency, new NodeModuleDependencyResolveAsName());
+    // compilation.dependencyTemplates.set(HarmonyImportSideEffectDependency, new NodeImportSideEffectDependencyTemplate());
+
 
     if (this.hasFeature('webpack/lib/dependencies/CommonJsFullRequireDependency')) {
       // 目前为webpack5

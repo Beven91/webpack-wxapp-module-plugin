@@ -126,6 +126,7 @@ class WxAppModulePlugin {
     definePlugin.apply(compiler);
     // 重新设置webpack相关依赖，用于修改输出模块引用体系
     compiler.hooks.make.tap('WxAppModulePlugin', (compilation) => {
+      // 处理wepack require
       WebpackVersion.initializeWebpackDependencies(compilation);
     });
     this.registerConfigResourcesEntry(compiler);
@@ -654,7 +655,7 @@ class WxAppModulePlugin {
         if (expression.type !== 'VariableDeclaration') return;
         const declarations = expression.declarations;
         let isWxCreateWorker = false;
-        if(declarations.length > 1) {
+        if (declarations.length > 1) {
           isWxCreateWorker = declarations[0]?.init?.name == 'wx' && declarations[1]?.init?.property?.name == CREATE_WORKER_NAME;
         } else {
           isWxCreateWorker = declarations[0]?.init?.object?.name == 'wx' && declarations[0]?.init?.property?.name == CREATE_WORKER_NAME;
@@ -680,7 +681,7 @@ class WxAppModulePlugin {
           expression.arguments[0].type === 'Literal'
         ) {
           const variable = parser.getVariableInfo(CREATE_WORKER_NAME);
-          if(variable?.tagInfo?.tag === 'wx.createWorker') {
+          if (variable?.tagInfo?.tag === 'wx.createWorker') {
             // 确保当前调用的createWorker是wx.createWorker
             const workerPath = expression.arguments[0].value;
             const context = parser.state.module.context;
