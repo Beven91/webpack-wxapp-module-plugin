@@ -37,6 +37,8 @@ const SCRIPT_REGEXP = /\.(js|ts)$/i;
 
 const isUrlExportRegexp = /module.exports(\s+|)=(\s+|)__webpack_public_path__/;
 
+const REG_WXS_EFFECT = /\.wxs\.(js|json|js\.map)$/i
+
 // 取消AMD模式
 AMDPlugin.prototype.apply = function () {
 
@@ -837,6 +839,11 @@ class WxAppModulePlugin {
       // 为了支持微信小程序开发者工具热重载，（除了第一次构建外）这里在不是改动json文件下，其他情况下不输出json assets
       this.needGenerateAssets = false;
       const assetKeys = Object.keys(this.mpJsonAssets);
+      Object.keys(assets).forEach((k)=>{
+        if(REG_WXS_EFFECT.test(k)) {
+          delete assets[k];
+        }
+      })
       delete assets['app.wxml'];
       const registryPages = this.registryPages.map((m) => m.replace(/\\/g, '/'));
       assetKeys.forEach((k) => {
@@ -1058,7 +1065,9 @@ class WxAppModulePlugin {
     const asset = assets[key];
     delete assets[key];
     assets[id] = asset;
-    this.pageOrComponents[mod.resource] = target;
+    if(!/\.wxs/i.test(mod.resource)) {
+      this.pageOrComponents[mod.resource] = target;
+    }
     return id;
   }
 
@@ -1120,7 +1129,7 @@ class WxAppModulePlugin {
     let nameWith = name + info.ext;
     const resource = mod.resource;
     let newChunk = this.extraChunks[nameWith];
-    if (this.resourceModulesMap[resource]) {
+    if (this.resourceModulesMap[resource] || /\.wxs$/.test(resource)) {
       return;
     }
     if (nameWith.indexOf('node_modules') > -1 || !mainReferences[resource]) {
