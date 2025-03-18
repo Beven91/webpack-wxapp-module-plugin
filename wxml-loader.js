@@ -10,8 +10,6 @@ const Runtime = require('./src/runtime');
 const SyntaxKind = parser.SyntaxKind;
 
 module.exports = function (content) {
-  // 开启缓存
-  // this.cacheable && this.cacheable();
   const done = this.async();
   try {
     const options = this.options || this.query || {};

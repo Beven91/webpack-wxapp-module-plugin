@@ -6,8 +6,6 @@ const babel = require('@babel/core');
 const loadModule = require('./src/helper/loadModule');
 
 module.exports = function (source, sourceMap) {
-  // 开启缓存模块
-  this.cacheable && this.cacheable();
   // 异步处理
   const done = this.async();
   try {

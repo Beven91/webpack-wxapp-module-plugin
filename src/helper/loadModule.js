@@ -1,14 +1,10 @@
 const path = require('path');
+const CommonJsFullRequireDependency = require('webpack/lib/dependencies/CommonJsFullRequireDependency')
 
 module.exports = function (id, ctx) {
-  return new Promise((resolve, reject) => {
-    let filePath = id;
-    if (!path.isAbsolute(id)) {
-      filePath = path.join(path.dirname(ctx.resourcePath), id)
-    }
-    ctx.addDependency(filePath);
-    ctx.loadModule(id, (err, src) => {
-      return err ? reject(err) : resolve(src)
-    });
-  });
+  if (!path.isAbsolute(id)) {
+    id = path.join(path.dirname(ctx.resourcePath), id)
+  }
+  const dep = new CommonJsFullRequireDependency(id, [-1, -1]);
+  ctx._module.addDependency(dep)
 }

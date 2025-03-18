@@ -12,7 +12,6 @@ const runtime = {
 }
 
 module.exports = function (content) {
-  this.cacheable && this.cacheable();
   const options = this.options || this.query || {};
   const context = Runtime.appRoot;
   const segments = path.parse(this.resourcePath);
