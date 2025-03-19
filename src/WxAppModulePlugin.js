@@ -130,7 +130,6 @@ class WxAppModulePlugin {
     compiler.hooks.make.tap('WxAppModulePlugin', (compilation) => {
       WebpackVersion.initializeWebpackDependencies(compilation);
     });
-    this.registerConfigResourcesEntry(compiler);
     compiler.hooks.invalid.tap('WxAppModulePlugin', (a) => {
       this.needGenerateAssets = /\.json$/.test(a);
       this.modifyedEntries[a] = true;
@@ -150,11 +149,7 @@ class WxAppModulePlugin {
       }
       this.compilation = compilation;
       try {
-        compilation.hooks.addEntry.tap('WxAppModulePlugin', (entry, options) => {
-          if (this.needRemoveEntries[options.name]) {
-            const a = entry;
-          }
-        });
+        this.registerConfigResourcesEntry(compiler);
         this.registerWxWorkerRequire(compiler, normalModuleFactory)
         this.initPackages();
         // 自动根据app.js作为入口，分析哪些文件需要单独产出，以及node_modules使用了哪些模块
