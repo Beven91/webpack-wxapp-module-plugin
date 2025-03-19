@@ -117,7 +117,6 @@ class WxAppModulePlugin {
     this.appRoot = Runtime.appRoot = path.dirname(path.join(this.projectRoot, app));
     this.distRoot = this.options.output.path;
     this.appConfigPath = path.join(this.appRoot, 'app.json');
-    this.appConfig = this.getJson(this.appConfigPath)
     this.Resolve.setOptions({ nodeModulesName: this.nodeModulesName, projectRoot: this.projectRoot });
 
     const definePlugin = new webpack.DefinePlugin({
@@ -241,6 +240,7 @@ class WxAppModulePlugin {
    * 注册配置文件输出
    */
   registerConfigResourcesEntry(compiler) {
+    this.appConfig = this.getJson(this.appConfigPath)
     const dir = this.runMode == 'plugin' ? this.plugin.root : this.appRoot;
     const id = path.join(dir, PROJECT_CONFIG);
     if (this.runMode == 'plugin') {
@@ -261,6 +261,10 @@ class WxAppModulePlugin {
       const loader = require.resolve('./loaders/json-loader.js');
       (new SingleEntryPlugin(this.projectRoot, loader + '!' + file, path.basename(file))).apply(compiler);
     })
+    if(appConfig.themeLocation) {
+      const themePath = path.join(this.projectRoot, appConfig.themeLocation);
+      this.themeConfig = this.getJson(themePath);
+    }
   }
 
   /**
@@ -538,6 +542,7 @@ class WxAppModulePlugin {
     const tabBar = config.tabBar || {};
     const tabBarList = tabBar.list || [];
     const appRoot = this.appRoot;
+    const themeConfig = this.themeConfig || {};
     tabBarList.forEach(function (tabBarItem) {
       if (tabBarItem.iconPath) {
         resourceModules.push(path.join(appRoot, tabBarItem.iconPath));
@@ -546,6 +551,21 @@ class WxAppModulePlugin {
         resourceModules.push(path.join(appRoot, tabBarItem.selectedIconPath));
       }
     });
+    const registerThemeResources = (data)=>{
+      if(data) {
+        Object.keys(data).forEach((k)=>{
+          const v = data[k];
+          if(typeof v !== 'string') return;
+          const id = path.join(appRoot, data[k]);
+          if(fse.existsSync(id) && fse.lstatSync(id).isFile()) {
+          console.log('add resource',id);
+            resourceModules.push(id);
+          }
+        })
+      }
+    }
+    registerThemeResources(themeConfig.light)
+    registerThemeResources(themeConfig.dark)
   }
 
   /**
