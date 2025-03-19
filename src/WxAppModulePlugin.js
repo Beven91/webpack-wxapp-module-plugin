@@ -39,6 +39,8 @@ const isUrlExportRegexp = /module.exports(\s+|)=(\s+|)__webpack_public_path__/;
 
 const REG_WXS_EFFECT = /\.wxs\.(js|json|js\.map)$/i
 
+const REG_THEME_VARIABLE = /^@/i;
+
 // 取消AMD模式
 AMDPlugin.prototype.apply = function () {
 
@@ -261,7 +263,7 @@ class WxAppModulePlugin {
       const loader = require.resolve('./loaders/json-loader.js');
       (new SingleEntryPlugin(this.projectRoot, loader + '!' + file, path.basename(file))).apply(compiler);
     })
-    if(appConfig.themeLocation) {
+    if (appConfig.themeLocation) {
       const themePath = path.join(this.projectRoot, appConfig.themeLocation);
       this.themeConfig = this.getJson(themePath);
     }
@@ -544,21 +546,21 @@ class WxAppModulePlugin {
     const appRoot = this.appRoot;
     const themeConfig = this.themeConfig || {};
     tabBarList.forEach(function (tabBarItem) {
-      if (tabBarItem.iconPath) {
-        resourceModules.push(path.join(appRoot, tabBarItem.iconPath));
+      const { iconPath, selectedIconPath } = tabBarItem;
+      if (iconPath && !REG_THEME_VARIABLE.test(iconPath)) {
+        resourceModules.push(path.join(appRoot, iconPath));
       }
-      if (tabBarItem.selectedIconPath) {
-        resourceModules.push(path.join(appRoot, tabBarItem.selectedIconPath));
+      if (selectedIconPath && !REG_THEME_VARIABLE.test(selectedIconPath)) {
+        resourceModules.push(path.join(appRoot, selectedIconPath));
       }
     });
-    const registerThemeResources = (data)=>{
-      if(data) {
-        Object.keys(data).forEach((k)=>{
+    const registerThemeResources = (data) => {
+      if (data) {
+        Object.keys(data).forEach((k) => {
           const v = data[k];
-          if(typeof v !== 'string') return;
+          if (typeof v !== 'string') return;
           const id = path.join(appRoot, data[k]);
-          if(fse.existsSync(id) && fse.lstatSync(id).isFile()) {
-          console.log('add resource',id);
+          if (fse.existsSync(id) && fse.lstatSync(id).isFile()) {
             resourceModules.push(id);
           }
         })
@@ -671,7 +673,7 @@ class WxAppModulePlugin {
         if (expression.type !== 'VariableDeclaration') return;
         const declarations = expression.declarations;
         let isWxCreateWorker = false;
-        if(declarations.length > 1) {
+        if (declarations.length > 1) {
           isWxCreateWorker = declarations[0]?.init?.name == 'wx' && declarations[1]?.init?.property?.name == CREATE_WORKER_NAME;
         } else {
           isWxCreateWorker = declarations[0]?.init?.object?.name == 'wx' && declarations[0]?.init?.property?.name == CREATE_WORKER_NAME;
@@ -697,7 +699,7 @@ class WxAppModulePlugin {
           expression.arguments[0].type === 'Literal'
         ) {
           const variable = parser.getVariableInfo(CREATE_WORKER_NAME);
-          if(variable?.tagInfo?.tag === 'wx.createWorker') {
+          if (variable?.tagInfo?.tag === 'wx.createWorker') {
             // 确保当前调用的createWorker是wx.createWorker
             const workerPath = expression.arguments[0].value;
             const context = parser.state.module.context;
@@ -854,8 +856,8 @@ class WxAppModulePlugin {
       // 为了支持微信小程序开发者工具热重载，（除了第一次构建外）这里在不是改动json文件下，其他情况下不输出json assets
       this.needGenerateAssets = false;
       const assetKeys = Object.keys(this.mpJsonAssets);
-      Object.keys(assets).forEach((k)=>{
-        if(REG_WXS_EFFECT.test(k)) {
+      Object.keys(assets).forEach((k) => {
+        if (REG_WXS_EFFECT.test(k)) {
           delete assets[k];
         }
       })
@@ -1080,7 +1082,7 @@ class WxAppModulePlugin {
     const asset = assets[key];
     delete assets[key];
     assets[id] = asset;
-    if(!/\.wxs/i.test(mod.resource)) {
+    if (!/\.wxs/i.test(mod.resource)) {
       this.pageOrComponents[mod.resource] = target;
     }
     return id;
