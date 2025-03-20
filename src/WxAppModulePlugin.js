@@ -640,15 +640,15 @@ class WxAppModulePlugin {
     normalModuleLoader.tap('WxAppModulePlugin', (loaderContext) => {
       let innerLoadModule = null;
       const loadModule = (request, callback) => {
-        innerLoadModule.call(loaderContext, request, (err, src) => {
+        innerLoadModule.call(loaderContext, request, (err, src, arg, arg1) => {
           if (err) {
             return callback(err);
           } else if (!isUrlExportRegexp.test(src)) {
-            return callback(err, src);
+            return callback(err, src, arg, arg1);
           }
           const myRequest = this.exec(src).replace(/(^\/|_\/)/g, '');
           const mod = loaderContext._module;
-          return callback(err, `module.exports =  "/${this.tranformPackUrl(mod, myRequest).replace(/\.\//g, '')}"`);
+          return callback(err, `module.exports =  "/${this.tranformPackUrl(mod, myRequest).replace(/\.\//g, '')}"`, arg, arg1);
         });
       };
       Object.defineProperty(loaderContext, 'loadModule', {
