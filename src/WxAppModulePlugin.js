@@ -260,8 +260,7 @@ class WxAppModulePlugin {
     ].filter(Boolean);
     appJsonAssets.forEach((m) => {
       const file = path.join(appRoot, m);
-      const loader = require.resolve('./loaders/json-loader.js');
-      (new SingleEntryPlugin(this.projectRoot, loader + '!' + file, path.basename(file))).apply(compiler);
+      (new SingleEntryPlugin(this.projectRoot, file, path.basename(file))).apply(compiler);
     })
     if (appConfig.themeLocation) {
       const themePath = path.join(this.projectRoot, appConfig.themeLocation);
@@ -924,7 +923,7 @@ class WxAppModulePlugin {
       };
       Object.keys(this.jsonAssets).forEach((k) => {
         const item = this.jsonAssets[k];
-        const content = this.readAssetFile(item, k);
+        const content = item.content ? item.content : this.readAssetFile(item, k);
         assets[this.normalizeOutputName(item.name)] = {
           size: () => content.length,
           source: () => content,
@@ -1160,7 +1159,7 @@ class WxAppModulePlugin {
       if (name.indexOf(PROJECT_CONFIG) > -1) {
         name = PROJECT_CONFIG;
       }
-      this.jsonAssets[mod.resource] = { name: name, content: '' };
+      this.jsonAssets[mod.resource] = { name: name, content: mod.buildInfo.jsonData._buffer };
       return;
     }
     name = name + ((info.ext === '.js' || info.ext == '.ts') ? '.js' : info.ext + '.js');
