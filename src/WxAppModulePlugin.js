@@ -1159,7 +1159,11 @@ class WxAppModulePlugin {
       if (name.indexOf(PROJECT_CONFIG) > -1) {
         name = PROJECT_CONFIG;
       }
-      this.jsonAssets[mod.resource] = { name: name, content: mod.buildInfo.jsonData._buffer };
+      let buffer = mod.buildInfo.jsonData._buffer;
+      if (!buffer) {
+        buffer = JSON.stringify(mod.buildInfo.jsonData._data, null, 2);
+      }
+      this.jsonAssets[mod.resource] = { name: name, content: buffer };
       return;
     }
     name = name + ((info.ext === '.js' || info.ext == '.ts') ? '.js' : info.ext + '.js');
