@@ -847,6 +847,7 @@ class WxAppModulePlugin {
     const exclude = this.exclude;
     //  处理页面与组件json输出
     compilation.hooks.optimizeAssets.tap('WxAppModulePlugin', (assets) => {
+      this.makeRequiredJsonAssets(assets);
       if (this.needGenerateAssets == false) {
         // 热更新处理
         this.makePluginDependencies(assets, true);
@@ -921,17 +922,20 @@ class WxAppModulePlugin {
         size: () => app.length,
         source: () => app,
       };
-      Object.keys(this.jsonAssets).forEach((k) => {
-        const item = this.jsonAssets[k];
-        const content = item.content ? item.content : this.readAssetFile(item, k);
-        assets[this.normalizeOutputName(item.name)] = {
-          size: () => content.length,
-          source: () => content,
-        };
-      });
       if (this.runMode == 'plugin') {
         this.makePluginDependencies(assets);
       }
+    });
+  }
+
+  makeRequiredJsonAssets(assets) {
+    Object.keys(this.jsonAssets).forEach((k) => {
+      const item = this.jsonAssets[k];
+      const content = item.content ? item.content : this.readAssetFile(item, k);
+      assets[this.normalizeOutputName(item.name)] = {
+        size: () => content.length,
+        source: () => content,
+      };
     });
   }
 
@@ -1158,6 +1162,9 @@ class WxAppModulePlugin {
       name = name + info.ext;
       if (name.indexOf(PROJECT_CONFIG) > -1) {
         name = PROJECT_CONFIG;
+      }
+      if(!mod.buildInfo.jsonData) {
+        return;
       }
       let buffer = mod.buildInfo.jsonData._buffer;
       if (!buffer) {
