@@ -847,8 +847,8 @@ class WxAppModulePlugin {
     const exclude = this.exclude;
     //  处理页面与组件json输出
     compilation.hooks.optimizeAssets.tap('WxAppModulePlugin', (assets) => {
-      this.makeRequiredJsonAssets(assets);
       if (this.needGenerateAssets == false) {
+        this.makeImportJsonAssets(assets, true);
         // 热更新处理
         this.makePluginDependencies(assets, true);
         return;
@@ -922,15 +922,18 @@ class WxAppModulePlugin {
         size: () => app.length,
         source: () => app,
       };
+      this.makeImportJsonAssets(assets);
       if (this.runMode == 'plugin') {
         this.makePluginDependencies(assets);
       }
     });
   }
 
-  makeRequiredJsonAssets(assets) {
+  makeImportJsonAssets(assets, isHotupdate) {
     Object.keys(this.jsonAssets).forEach((k) => {
       const item = this.jsonAssets[k];
+      if(isHotupdate && !item.isNeedMake) return;
+      item.isNeedMake = false;
       const content = item.content ? item.content : this.readAssetFile(item, k);
       assets[this.normalizeOutputName(item.name)] = {
         size: () => content.length,
@@ -1169,8 +1172,10 @@ class WxAppModulePlugin {
       let buffer = mod.buildInfo.jsonData._buffer;
       if (!buffer) {
         buffer = JSON.stringify(mod.buildInfo.jsonData._data, null, 2);
+        this.jsonAssets[mod.resource] = { name: name, content: buffer, isNeedMake: true };
+      } else {
+        this.jsonAssets[mod.resource] = { name: name, content: buffer };
       }
-      this.jsonAssets[mod.resource] = { name: name, content: buffer };
       return;
     }
     name = name + ((info.ext === '.js' || info.ext == '.ts') ? '.js' : info.ext + '.js');
