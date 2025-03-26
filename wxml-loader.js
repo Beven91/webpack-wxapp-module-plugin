@@ -48,7 +48,11 @@ function resolveDependencies(content, options, resourcePath) {
           addDependency(dependencies, node.attributeMap['src'], node, resourcePath);
           break;
         default:
-          addDependency(dependencies, getRefValue(node, refKeys), node, resourcePath);
+          refKeys.forEach((key) => {
+            const value = node.attributeMap[key];
+            if (!value) return;
+            addDependency(dependencies, node.attributeMap[key], node, resourcePath);
+          })
           break;
       }
     },
