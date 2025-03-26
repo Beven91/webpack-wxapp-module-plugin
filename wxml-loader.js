@@ -12,7 +12,8 @@ const SyntaxKind = parser.SyntaxKind;
 module.exports = function (content) {
   const done = this.async();
   try {
-    const options = this.options || this.query || {};
+    const options = this.getOptions();
+    // const options = this.options || this.query || {};
     // 搜寻所有依赖
     const dependencies = resolveDependencies(content, options, this.resourcePath);
     // 将所有依赖加载
