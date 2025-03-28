@@ -27,13 +27,18 @@ module.exports = function (content) {
         return loadModule(dep.request, this, dep.useRootRelative).then((src) => {
           if (dep.useRootRelative) {
             // 如果需要替换
+            const onReplace = dep.onReplace;
             const valueAttr = dep.attr.value;
             const value = valueAttr.value;
             const count = valueAttr.end - valueAttr.start;
             const start = valueAttr.start + runtime.offset;
             const prefix = valueAttr.quote ? valueAttr.quote : '';
             const suffix = valueAttr.quote ? valueAttr.quote : value[value.length - 1];
-            runtime.elements.splice(start, count, prefix + src + suffix);
+            let newSource = prefix + src + suffix;
+            if(typeof onReplace === 'function') {
+              newSource = onReplace(newSource,src, dep);
+            }
+            runtime.elements.splice(start, count, newSource);
             runtime.offset = runtime.offset + (1 - count);
           }
         })
@@ -80,8 +85,8 @@ function resolveDependencies(content, options, resourcePath) {
       }
       return null;
     },
-    addDependency: (attr, node, useRootRelative) => {
-      addDependency(dependencies, attr, node, resourcePath, useRootRelative)
+    addDependency: (attr, node, useRootRelative, onReplace) => {
+      addDependency(dependencies, attr, node, resourcePath, useRootRelative, onReplace)
     },
     addAsset: (url, node) => {
       if (!ctx.resolvePath(url)) return;
@@ -126,13 +131,19 @@ function resolveDependencies(content, options, resourcePath) {
   return dependencies;
 }
 
-function addDependency(dependencies, attr, node, resourcePath, useRootRelative) {
+function addDependency(dependencies, attr, node, resourcePath, useRootRelative, onReplace) {
   const url = getAttributeSrc(attr, resourcePath);
   if (!url) return;
   dependencies.push({
+    // 当前要引用的资源地址
     request: url,
+    // 当前src属性
     attr: attr,
+    // 当前标签节点
     node: node,
+    // 在开启useRootRelative 时自定义替换函数
+    onReplace: onReplace,
+    // 是否使用根路径，而不是相对路径 
     useRootRelative: useRootRelative
   });
 }
