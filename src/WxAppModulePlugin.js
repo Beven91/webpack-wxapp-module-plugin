@@ -330,7 +330,12 @@ class WxAppModulePlugin {
           const parts = path.parse(modulePath);
           const namePath = path.join(parts.dir, parts.name);
           // 搜索当前页面对应的资源文件 例如: .wxml .wxss .json
-          pack.resources = pack.resources.concat(this.typedExtensions.map((ext) => namePath + ext));
+          pack.resources = pack.resources.concat(this.typedExtensions.map((ext) => {
+            if(typeof ext == 'function') {
+              return ext(namePath);
+            }
+            return namePath + ext;
+          }));
         });
         // 过滤掉不存在的文件
         pack.resources = pack.resources.filter(fse.existsSync.bind(fse));
