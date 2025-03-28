@@ -1,6 +1,7 @@
 const path = require('path');
+const exec = require('./exec');
 
-module.exports = function (id, ctx) {
+module.exports = function (id, ctx, getSrc) {
   return new Promise((resolve, reject) => {
     if (!path.isAbsolute(id)) {
       id = path.join(path.dirname(ctx.resourcePath), id)
@@ -27,7 +28,7 @@ module.exports = function (id, ctx) {
           buildInfo.assetsInfo.set(key, value);
         })
       }
-      resolve()
+      resolve( getSrc ? exec(content) : '')
     })
   })
 }

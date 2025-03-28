@@ -6,7 +6,6 @@
  * 描述：
  *     使微信程序支持webpack打包
  */
-const vm = require('vm');
 const path = require('path');
 const fse = require('fs-extra');
 const webpack = require('webpack');
@@ -18,10 +17,10 @@ const ConcatSource = require('webpack').sources.ConcatSource;
 const WebpackVersion = require('./WebpackVersion');
 const Runtime = require('./runtime');
 const WxWorkerDependency = require('./dependencies/WxWorkerDependency')
+const NameResolve = require('./dependencies/NameResolve');
+const exec = require('./helper/exec.js');
 
 const MPEXT = ['.js', '.wxss', '.wxml', '.json', '.js.map'];
-
-const NameResolve = require('./dependencies/NameResolve');
 
 const subPackRegexp = /subPack:/;
 
@@ -62,7 +61,12 @@ class WxAppModulePlugin {
    * @parma {Object} 全局配置
    */
   constructor(nodeModulesName, extensions, options) {
-    options = options || [];
+    if (arguments.length == 1 && nodeModulesName && typeof nodeModulesName === 'object') {
+      options = nodeModulesName;
+      nodeModulesName = options.nodeModulesName || 'npm_modules';
+      extensions = options.resolveExtensions || [];
+    }
+    options = options || {};
     this.extraChunks = {};
     this.extraPackage = {};
     this.packages = [];
@@ -282,6 +286,7 @@ class WxAppModulePlugin {
       this.normalizeNameMap = {};
       this.readyMainReferences = {};
       this.mainReferences = {};
+      this.resourcesMetaInfo = {};
       this.Resolve.initSymlinks();
       // 主包
       const main = this.createPackage(appRoot, ['app'].concat(config.pages), 'main');
@@ -331,10 +336,14 @@ class WxAppModulePlugin {
           const namePath = path.join(parts.dir, parts.name);
           // 搜索当前页面对应的资源文件 例如: .wxml .wxss .json
           pack.resources = pack.resources.concat(this.typedExtensions.map((ext) => {
-            if(typeof ext == 'function') {
-              return ext(namePath);
+            let file = namePath + ext;
+            if (typeof ext == 'function') {
+              file = ext(namePath);
             }
-            return namePath + ext;
+            if (typeof ext == 'string' && ext.split('.').length > 2) {
+              this.resourcesMetaInfo[file] = { baseName: path.basename(namePath) }
+            }
+            return file;
           }));
         });
         // 过滤掉不存在的文件
@@ -937,7 +946,7 @@ class WxAppModulePlugin {
   makeImportJsonAssets(assets, isHotupdate) {
     Object.keys(this.jsonAssets).forEach((k) => {
       const item = this.jsonAssets[k];
-      if(isHotupdate && !item.isNeedMake) return;
+      if (isHotupdate && !item.isNeedMake) return;
       item.isNeedMake = false;
       const content = item.content ? item.content : this.readAssetFile(item, k);
       assets[this.normalizeOutputName(item.name)] = {
@@ -1089,6 +1098,10 @@ class WxAppModulePlugin {
   }
 
   replaceAsset(target, key, mod, assets) {
+    const needKeepOriginal = this.resourcesMetaInfo[mod.resource];
+    if (needKeepOriginal) {
+      target = path.dirname(target) + '/' + needKeepOriginal.baseName + path.extname(target)
+    }
     const id = this.normalizeOutputName(target);
     const asset = assets[key];
     delete assets[key];
@@ -1171,7 +1184,7 @@ class WxAppModulePlugin {
       if (name.indexOf(PROJECT_CONFIG) > -1) {
         name = PROJECT_CONFIG;
       }
-      if(!mod.buildInfo.jsonData) {
+      if (!mod.buildInfo.jsonData) {
         return;
       }
       let buffer = mod.buildInfo.jsonData._buffer;
@@ -1320,13 +1333,7 @@ class WxAppModulePlugin {
   }
 
   exec(src) {
-    const script = new vm.Script(src, { displayErrors: true });
-    const sandbox = {
-      __webpack_public_path__: '',
-      module: {},
-    };
-    script.runInNewContext(sandbox);
-    return sandbox.module.exports.toString();
+    return exec(src);
   }
 }
 

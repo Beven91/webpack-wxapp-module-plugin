@@ -41,11 +41,23 @@ module.exports = {
     libraryTarget: 'commonjs2'
   },
   plugins:[
-    new WxappModulePlugin('npm_modules', ['.scss'], {
+    new WxappModulePlugin({
+      // 构建后node_modules下模块存放目录名
+      nodeModulesName: 'npm_modules',
+      // 当前运行模式： plugin / miniprogram 默认为 miniprogram
+      // mode: 'plugin',
+      // 插件模式下，插件代码根目录
+      // pluginRoot: path.resolve('packages/mp-stjk-plugin'),
       // 全局组件
       globalComponents:{
         // 'layout-master':'my/index'
       }
+      // 支持额外的资源扩展名，例如支持index.scss
+      resolveExtensions: [
+        '.scss',
+        // 或者 (id)=>  id + '.scss'
+      ],
+      
     }),
   ],
   module:{
