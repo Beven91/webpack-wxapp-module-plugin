@@ -17,7 +17,7 @@ module.exports = function (content) {
     // 搜寻所有依赖
     const dependencies = resolveDependencies(content, options, this.resourcePath);
     const needModify = !!dependencies.find((m) => m.useRootRelative);
-    const runtime = { offset: 0, elements: null };
+    const runtime = { elements: null };
     if (needModify) {
       runtime.elements = content.split('');
     }
@@ -30,16 +30,18 @@ module.exports = function (content) {
             const onReplace = dep.onReplace;
             const valueAttr = dep.attr.value;
             const value = valueAttr.value;
-            const count = valueAttr.end - valueAttr.start;
-            const start = valueAttr.start + runtime.offset;
+            const start = valueAttr.start;
+            const end = valueAttr.end;
             const prefix = valueAttr.quote ? valueAttr.quote : '';
             const suffix = valueAttr.quote ? valueAttr.quote : value[value.length - 1];
             let newSource = prefix + src + suffix;
-            if(typeof onReplace === 'function') {
-              newSource = onReplace(newSource,src, dep);
+            if (typeof onReplace === 'function') {
+              newSource = onReplace(newSource, src, dep);
             }
-            runtime.elements.splice(start, count, newSource);
-            runtime.offset = runtime.offset + (1 - count);
+            runtime.elements[start] = newSource;
+            for (let i = start + 1; i < end; i++) {
+              runtime.elements[i] = '';
+            }
           }
         })
       }))
